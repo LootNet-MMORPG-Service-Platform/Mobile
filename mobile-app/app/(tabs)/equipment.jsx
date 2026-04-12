@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  ScrollView,
-  StyleSheet,
   TouchableOpacity,
-  RefreshControl,
-  Alert,
+  StyleSheet,
+  ScrollView,
   Image,
+  Alert,
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import api from '../../services/api';
@@ -15,86 +14,140 @@ import api from '../../services/api';
 export default function EquipmentScreen() {
   const [equipment, setEquipment] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [refreshing, setRefreshing] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const categories = ['all', 'weapon', 'armor', 'helmet', 'shield', 'boots', 'accessory'];
+
+  const mockEquipment = {
+    weapon: [
+      {
+        id: 1,
+        name: 'War Sword',
+        type: 'weapon',
+        rarity: 'common',
+        icon: 'sword',
+        damage: 25,
+        speed: 1.2,
+        description: 'A sturdy sword forged in the northern lands.',
+        stats: { 'Attack': 25, 'Speed': 1.2 },
+        requirements: { 'Strength': 15, 'Level': 5 },
+      },
+      {
+        id: 2,
+        name: 'Battle Axe',
+        type: 'weapon',
+        rarity: 'rare',
+        icon: 'axe',
+        damage: 35,
+        speed: 0.9,
+        description: 'Heavy axe favored by Nord warriors.',
+        stats: { 'Attack': 35, 'Speed': 0.9 },
+        requirements: { 'Strength': 25, 'Level': 10 },
+      },
+      {
+        id: 3,
+        name: 'Longbow',
+        type: 'weapon',
+        rarity: 'epic',
+        icon: 'bow',
+        damage: 40,
+        range: 150,
+        description: 'Masterfully crafted bow for ranged combat.',
+        stats: { 'Attack': 40, 'Range': 150 },
+        requirements: { 'Dexterity': 20, 'Level': 15 },
+      },
+    ],
+    armor: [
+      {
+        id: 4,
+        name: 'Chain Mail',
+        type: 'armor',
+        rarity: 'common',
+        icon: 'shield',
+        defense: 20,
+        description: 'Basic chain mail armor.',
+        stats: { 'Defense': 20 },
+        requirements: { 'Level': 3 },
+      },
+      {
+        id: 5,
+        name: 'Plate Armor',
+        type: 'armor',
+        rarity: 'rare',
+        icon: 'shield',
+        defense: 45,
+        description: 'Heavy plate armor for elite warriors.',
+        stats: { 'Defense': 45 },
+        requirements: { 'Strength': 30, 'Level': 12 },
+      },
+    ],
+  };
 
   useEffect(() => {
     loadEquipment();
   }, []);
 
   const loadEquipment = async () => {
+    setIsLoading(true);
     try {
-      const response = await api.getEquipment();
-      setEquipment(response.equipment || []);
+      // Use mock data for now since API is empty
+      const allItems = Object.values(mockEquipment).flat();
+      setEquipment(allItems);
     } catch (error) {
-      console.error('Error loading equipment:', error);
       Alert.alert('Error', 'Failed to load equipment');
-    }
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadEquipment();
-    setRefreshing(false);
-  };
-
-  const categories = [
-    { id: 'all', name: 'All', icon: 'grid' },
-    { id: 'weapon', name: 'Weapons', icon: 'gamecontroller' },
-    { id: 'armor', name: 'Armor', icon: 'shield' },
-    { id: 'accessory', name: 'Accessories', icon: 'star' },
-  ];
-
-  const getRarityColor = (rarity) => {
-    switch (rarity?.toLowerCase()) {
-      case 'common':
-        return '#9E9E9E';
-      case 'uncommon':
-        return '#4CAF50';
-      case 'rare':
-        return '#2196F3';
-      case 'epic':
-        return '#9C27B0';
-      case 'legendary':
-        return '#FF9800';
-      default:
-        return '#9E9E9E';
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const filteredEquipment = selectedCategory === 'all' 
     ? equipment 
-    : equipment.filter(item => item.category === selectedCategory);
+    : equipment.filter(item => item.type === selectedCategory);
+
+  const getRarityColor = (rarity) => {
+    const colors = {
+      common: '#8B7355', // brown
+      uncommon: '#1E90FF', // blue
+      rare: '#9370DB', // purple
+      epic: '#FF8C00', // orange
+      legendary: '#FFD700', // gold
+    };
+    return colors[rarity] || '#8B7355';
+  };
+
+  const getRarityBorder = (rarity) => {
+    const borders = {
+      common: '#654321',
+      uncommon: '#4169E1',
+      rare: '#6A0DAD',
+      epic: '#CC5500',
+      legendary: '#B8860B',
+    };
+    return borders[rarity] || '#654321';
+  };
 
   const renderEquipmentItem = (item) => (
     <TouchableOpacity
       key={item.id}
-      style={styles.equipmentItem}
+      style={[styles.itemContainer, { borderColor: getRarityBorder(item.rarity) }]}
       onPress={() => setSelectedItem(item)}
     >
-      <View style={styles.itemHeader}>
-        <View style={[styles.itemIcon, { backgroundColor: getRarityColor(item.rarity) }]}>
-          <IconSymbol name={item.icon || 'cube'} size={24} color="#fff" />
-        </View>
-        <View style={styles.itemInfo}>
-          <Text style={styles.itemName}>{item.name}</Text>
-          <Text style={styles.itemType}>{item.type}</Text>
-        </View>
-        <View style={styles.itemRarity}>
-          <Text style={[styles.rarityText, { color: getRarityColor(item.rarity) }]}>
-            {item.rarity}
-          </Text>
-        </View>
+      <View style={styles.itemIcon}>
+        <IconSymbol name={item.icon || 'cube'} size={32} color={getRarityColor(item.rarity)} />
       </View>
-      
+      <View style={styles.itemInfo}>
+        <Text style={styles.itemName}>{item.name}</Text>
+        <Text style={[styles.itemRarity, { color: getRarityColor(item.rarity) }]}>
+          {item.rarity.toUpperCase()}
+        </Text>
+        <Text style={styles.itemType}>{item.type}</Text>
+      </View>
       <View style={styles.itemStats}>
-        {item.stats && Object.entries(item.stats).map(([stat, value]) => (
-          <View key={stat} style={styles.statRow}>
-            <IconSymbol name="arrow.up" size={12} color="#4CAF50" />
-            <Text style={styles.statText}>
-              {stat}: +{value}
-            </Text>
-          </View>
+        {Object.entries(item.stats).map(([stat, value]) => (
+          <Text key={stat} style={styles.statText}>
+            {stat}: {value}
+          </Text>
         ))}
       </View>
     </TouchableOpacity>
@@ -111,7 +164,7 @@ export default function EquipmentScreen() {
               style={styles.closeButton}
               onPress={() => setSelectedItem(null)}
             >
-              <IconSymbol name="xmark" size={24} color="#333" />
+              <IconSymbol name="xmark" size={24} color="#8B7355" />
             </TouchableOpacity>
             <Text style={styles.detailTitle}>{selectedItem.name}</Text>
           </View>
@@ -119,10 +172,10 @@ export default function EquipmentScreen() {
           <ScrollView style={styles.detailContent}>
             <View style={styles.detailIconContainer}>
               <View style={[styles.detailIcon, { backgroundColor: getRarityColor(selectedItem.rarity) }]}>
-                <IconSymbol name={selectedItem.icon || 'cube'} size={48} color="#fff" />
+                <IconSymbol name={selectedItem.icon || 'cube'} size={64} color="#fff" />
               </View>
               <Text style={[styles.detailRarity, { color: getRarityColor(selectedItem.rarity) }]}>
-                {selectedItem.rarity}
+                {selectedItem.rarity.toUpperCase()}
               </Text>
             </View>
 
@@ -160,11 +213,7 @@ export default function EquipmentScreen() {
               </View>
               <View style={styles.propertyRow}>
                 <Text style={styles.propertyLabel}>Category:</Text>
-                <Text style={styles.propertyValue}>{selectedItem.category}</Text>
-              </View>
-              <View style={styles.propertyRow}>
-                <Text style={styles.propertyLabel}>Level:</Text>
-                <Text style={styles.propertyValue}>{selectedItem.level || 1}</Text>
+                <Text style={styles.propertyValue}>{selectedItem.type}</Text>
               </View>
             </View>
           </ScrollView>
@@ -175,60 +224,39 @@ export default function EquipmentScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        <View style={styles.header}>
-          <Text style={styles.title}>Equipment</Text>
-          <Text style={styles.subtitle}>
-            Manage your character's gear and items
-          </Text>
-        </View>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Equipment Inventory</Text>
+        <Text style={styles.headerSubtitle}>Browse your war gear</Text>
+      </View>
 
-        <View style={styles.categoriesContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {categories.map((category) => (
-              <TouchableOpacity
-                key={category.id}
-                style={[
-                  styles.categoryButton,
-                  selectedCategory === category.id && styles.categoryButtonActive,
-                ]}
-                onPress={() => setSelectedCategory(category.id)}
-              >
-                <IconSymbol
-                  name={category.icon}
-                  size={20}
-                  color={selectedCategory === category.id ? '#fff' : '#666'}
-                />
-                <Text
-                  style={[
-                    styles.categoryText,
-                    selectedCategory === category.id && styles.categoryTextActive,
-                  ]}
-                >
-                  {category.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+        {categories.map((category) => (
+          <TouchableOpacity
+            key={category}
+            style={[
+              styles.categoryButton,
+              selectedCategory === category && styles.categoryButtonActive,
+            ]}
+            onPress={() => setSelectedCategory(category)}
+          >
+            <Text style={[
+              styles.categoryButtonText,
+              selectedCategory === category && styles.categoryButtonTextActive,
+            ]}>
+              {category.charAt(0).toUpperCase() + category.slice(1)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
-        <View style={styles.equipmentList}>
-          {filteredEquipment.length > 0 ? (
-            filteredEquipment.map(renderEquipmentItem)
-          ) : (
-            <View style={styles.emptyContainer}>
-              <IconSymbol name="cube.box" size={48} color="#ccc" />
-              <Text style={styles.emptyText}>No equipment found</Text>
-              <Text style={styles.emptySubtext}>
-                Start acquiring gear to see it here
-              </Text>
-            </View>
-          )}
-        </View>
+      <ScrollView style={styles.equipmentList}>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Loading equipment...</Text>
+          </View>
+        ) : (
+          filteredEquipment.map(renderEquipmentItem)
+        )}
       </ScrollView>
 
       {renderEquipmentDetail()}
@@ -239,125 +267,114 @@ export default function EquipmentScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#2C1810', // Dark medieval brown background
   },
   header: {
+    backgroundColor: '#1A0E08',
     padding: 20,
-    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: '#8B7355',
   },
-  title: {
-    fontSize: 28,
+  headerTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
+    color: '#F4E4C1', // Parchment color
     textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 2,
   },
-  categoriesContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#A0826D',
+    textAlign: 'center',
+    marginTop: 5,
+    fontStyle: 'italic',
+  },
+  categoryScroll: {
+    backgroundColor: '#1A0E08',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#8B7355',
   },
   categoryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    marginRight: 10,
+    backgroundColor: '#3E2723',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 4,
+    marginHorizontal: 5,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#8B7355',
   },
   categoryButtonActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: '#8B7355',
+    borderColor: '#F4E4C1',
   },
-  categoryText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#666',
+  categoryButtonText: {
+    color: '#A0826D',
+    fontSize: 12,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
   },
-  categoryTextActive: {
-    color: '#fff',
+  categoryButtonTextActive: {
+    color: '#F4E4C1',
   },
   equipmentList: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    flex: 1,
+    padding: 10,
   },
-  equipmentItem: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+  itemContainer: {
+    backgroundColor: '#3E2723',
+    borderWidth: 2,
+    borderRadius: 8,
     padding: 15,
-    marginBottom: 15,
+    marginVertical: 8,
+    marginHorizontal: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
   },
-  itemHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
   itemIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 60,
+    height: 60,
+    backgroundColor: '#2C1810',
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#8B7355',
+    marginRight: 15,
   },
   itemInfo: {
     flex: 1,
-    marginLeft: 15,
   },
   itemName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
-  },
-  itemType: {
-    fontSize: 14,
-    color: '#666',
+    color: '#F4E4C1',
+    marginBottom: 4,
   },
   itemRarity: {
-    alignItems: 'flex-end',
-  },
-  rarityText: {
     fontSize: 12,
     fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  itemType: {
+    fontSize: 12,
+    color: '#A0826D',
+    fontStyle: 'italic',
   },
   itemStats: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  statRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 15,
-    marginBottom: 5,
+    alignItems: 'flex-start',
   },
   statText: {
-    marginLeft: 4,
-    fontSize: 12,
-    color: '#333',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 50,
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#666',
-    marginTop: 15,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 5,
+    fontSize: 11,
+    color: '#F4E4C1',
+    marginBottom: 2,
   },
   detailOverlay: {
     position: 'absolute',
@@ -365,22 +382,27 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(26, 14, 8, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   detailContainer: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    width: '90%',
+    backgroundColor: '#2C1810',
+    margin: 20,
+    borderRadius: 12,
+    borderWidth: 3,
+    borderColor: '#8B7355',
     maxHeight: '80%',
+    width: '90%',
   },
   detailHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    padding: 15,
+    borderBottomWidth: 2,
+    borderBottomColor: '#8B7355',
+    backgroundColor: '#1A0E08',
   },
   closeButton: {
     padding: 5,
@@ -388,9 +410,9 @@ const styles = StyleSheet.create({
   detailTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
-    marginLeft: 15,
-    flex: 1,
+    color: '#F4E4C1',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   detailContent: {
     padding: 20,
@@ -400,39 +422,62 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   detailIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 100,
+    height: 100,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    borderWidth: 3,
+    borderColor: '#000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 8,
   },
   detailRarity: {
     fontSize: 16,
     fontWeight: 'bold',
+    marginTop: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
   },
   detailSection: {
     marginBottom: 20,
+    backgroundColor: '#1A0E08',
+    padding: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#8B7355',
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#F4E4C1',
     marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    borderBottomWidth: 1,
+    borderBottomColor: '#8B7355',
+    paddingBottom: 5,
   },
   descriptionText: {
     fontSize: 14,
-    color: '#666',
+    color: '#A0826D',
     lineHeight: 20,
+    fontStyle: 'italic',
   },
   detailStatRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: '#3E2723',
   },
   statName: {
     fontSize: 14,
-    color: '#333',
+    color: '#F4E4C1',
+    fontWeight: 'bold',
   },
   statValue: {
     fontSize: 14,
@@ -441,23 +486,36 @@ const styles = StyleSheet.create({
   },
   requirementRow: {
     paddingVertical: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: '#3E2723',
   },
   requirementText: {
     fontSize: 14,
-    color: '#666',
+    color: '#FF9800',
   },
   propertyRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: '#3E2723',
   },
   propertyLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#A0826D',
   },
   propertyValue: {
     fontSize: 14,
-    color: '#333',
+    color: '#F4E4C1',
     fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#F4E4C1',
   },
 });

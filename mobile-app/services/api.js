@@ -48,77 +48,23 @@ class ApiService {
 
   // Authentication endpoints - TO BE IMPLEMENTED BY BACKEND
   async login(email, password) {
-    // TODO: Implement backend endpoint
     return this.request('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    };
-    
-    const validationErrors = await this.validateInput({ email, password }, validationRules);
-    if (validationErrors.length > 0) {
-      throw new Error(validationErrors.join(', '));
-    }
-    
-    // Sanitize input
-    const sanitizedData = this.sanitizeInput({ email, password });
-    
-    try {
-      const response = await this.request('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(sanitizedData),
-      });
-      
-      // Set tokens after successful login
-      if (response.token) {
-        this.setToken(response.token, response.refreshToken);
-      }
-      
-      return response;
-    } catch (error) {
-      throw error;
-    }
   }
 
   async register(userData) {
-    // Validate input
-    const validationRules = {
-      username: { required: true, minLength: 3, maxLength: 20, pattern: /^[a-zA-Z0-9_]+$/ },
-      email: { required: true, type: 'email' },
-      password: { required: true, minLength: 8, maxLength: 128 },
-    };
-    
-    const validationErrors = await this.validateInput(userData, validationRules);
-    if (validationErrors.length > 0) {
-      throw new Error(validationErrors.join(', '));
-    }
-    
-    // Sanitize input
-    const sanitizedData = this.sanitizeInput(userData);
-    
     return this.request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify(sanitizedData),
+      body: JSON.stringify(userData),
     });
   }
 
   async resetPassword(email) {
-    // Validate input
-    const validationRules = {
-      email: { required: true, type: 'email' },
-    };
-    
-    const validationErrors = await this.validateInput({ email }, validationRules);
-    if (validationErrors.length > 0) {
-      throw new Error(validationErrors.join(', '));
-    }
-    
-    // Sanitize input
-    const sanitizedData = this.sanitizeInput({ email });
-    
     return this.request('/auth/reset-password', {
       method: 'POST',
-      body: JSON.stringify(sanitizedData),
+      body: JSON.stringify({ email }),
     });
   }
 
@@ -128,7 +74,7 @@ class ApiService {
     });
   }
 
-  // User endpoints
+  // User endpoints - TO BE IMPLEMENTED BY BACKEND
   async getUserProfile() {
     return this.request('/user/profile');
   }
@@ -140,7 +86,7 @@ class ApiService {
     });
   }
 
-  // Game endpoints
+  // Game endpoints - TO BE IMPLEMENTED BY BACKEND
   async getEquipment() {
     return this.request('/game/equipment');
   }
@@ -153,6 +99,10 @@ class ApiService {
     return this.request('/game/daily-reward', {
       method: 'POST',
     });
+  }
+
+  async getDailyRewardStatus() {
+    return this.request('/game/daily-reward/status');
   }
 
   async startBattle(botDifficulty = 'normal') {
