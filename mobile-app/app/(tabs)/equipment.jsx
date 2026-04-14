@@ -5,11 +5,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Image,
   Alert,
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import api from '../../services/api';
+import authService from '../../services/authService';
 
 export default function EquipmentScreen() {
   const [equipment, setEquipment] = useState([]);
@@ -19,71 +18,6 @@ export default function EquipmentScreen() {
 
   const categories = ['all', 'weapon', 'armor', 'helmet', 'shield', 'boots', 'accessory'];
 
-  const mockEquipment = {
-    weapon: [
-      {
-        id: 1,
-        name: 'War Sword',
-        type: 'weapon',
-        rarity: 'common',
-        icon: 'sword',
-        damage: 25,
-        speed: 1.2,
-        description: 'A sturdy sword forged in the northern lands.',
-        stats: { 'Attack': 25, 'Speed': 1.2 },
-        requirements: { 'Strength': 15, 'Level': 5 },
-      },
-      {
-        id: 2,
-        name: 'Battle Axe',
-        type: 'weapon',
-        rarity: 'rare',
-        icon: 'axe',
-        damage: 35,
-        speed: 0.9,
-        description: 'Heavy axe favored by Nord warriors.',
-        stats: { 'Attack': 35, 'Speed': 0.9 },
-        requirements: { 'Strength': 25, 'Level': 10 },
-      },
-      {
-        id: 3,
-        name: 'Longbow',
-        type: 'weapon',
-        rarity: 'epic',
-        icon: 'bow',
-        damage: 40,
-        range: 150,
-        description: 'Masterfully crafted bow for ranged combat.',
-        stats: { 'Attack': 40, 'Range': 150 },
-        requirements: { 'Dexterity': 20, 'Level': 15 },
-      },
-    ],
-    armor: [
-      {
-        id: 4,
-        name: 'Chain Mail',
-        type: 'armor',
-        rarity: 'common',
-        icon: 'shield',
-        defense: 20,
-        description: 'Basic chain mail armor.',
-        stats: { 'Defense': 20 },
-        requirements: { 'Level': 3 },
-      },
-      {
-        id: 5,
-        name: 'Plate Armor',
-        type: 'armor',
-        rarity: 'rare',
-        icon: 'shield',
-        defense: 45,
-        description: 'Heavy plate armor for elite warriors.',
-        stats: { 'Defense': 45 },
-        requirements: { 'Strength': 30, 'Level': 12 },
-      },
-    ],
-  };
-
   useEffect(() => {
     loadEquipment();
   }, []);
@@ -91,9 +25,12 @@ export default function EquipmentScreen() {
   const loadEquipment = async () => {
     setIsLoading(true);
     try {
-      // Use mock data for now since API is empty
-      const allItems = Object.values(mockEquipment).flat();
-      setEquipment(allItems);
+      const result = await authService.getEquipment();
+      if (result.success) {
+        setEquipment(result.data || []);
+      } else {
+        Alert.alert('Error', result.error || 'Failed to load equipment');
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to load equipment');
     } finally {
@@ -103,51 +40,82 @@ export default function EquipmentScreen() {
 
   const filteredEquipment = selectedCategory === 'all' 
     ? equipment 
-    : equipment.filter(item => item.type === selectedCategory);
+    : equipment.filter(item => {
+        if (selectedCategory === 'weapon') {
+          return item.weaponType !== undefined;
+        } else if (selectedCategory === 'armor') {
+          return item.armorType !== undefined;
+        }
+        return false;
+      });
 
-  const getRarityColor = (rarity) => {
-    const colors = {
-      common: '#8B7355', // brown
-      uncommon: '#1E90FF', // blue
-      rare: '#9370DB', // purple
-      epic: '#FF8C00', // orange
-      legendary: '#FFD700', // gold
-    };
-    return colors[rarity] || '#8B7355';
+  const getRarityColor = (item) => {
+    if (item.weaponType) {
+      return '#8B7355';
+    } else if (item.armorType) {
+      return '#4169E1';
+    }
+    return '#666666';
   };
 
-  const getRarityBorder = (rarity) => {
-    const borders = {
-      common: '#654321',
-      uncommon: '#4169E1',
-      rare: '#6A0DAD',
-      epic: '#CC5500',
-      legendary: '#B8860B',
+  const getRarityBorder = (item) => {
+    const color = getRarityColor(item);
+    return color.replace('#', '#654321');
+  };
+
+  const getWeaponTypeDisplay = (weaponType) => {
+    const types = {
+      'Sword': 'Sword',
+      'Axe': 'Axe', 
+      'Spear': 'Spear',
+      'Mace': 'Mace'
     };
-    return borders[rarity] || '#654321';
+    return types[weaponType] || 'Unknown';
+  };
+
+  const getArmorTypeDisplay = (armorType) => {
+    const types = {
+      1: 'Light Armor',
+      2: 'Medium Armor', 
+      3: 'Heavy Armor'
+    };
+    return types[armorType] || 'Unknown';
   };
 
   const renderEquipmentItem = (item) => (
     <TouchableOpacity
       key={item.id}
-      style={[styles.itemContainer, { borderColor: getRarityBorder(item.rarity) }]}
+      style={[styles.itemContainer, { borderColor: getRarityBorder(item) }]}
       onPress={() => setSelectedItem(item)}
     >
       <View style={styles.itemIcon}>
-        <IconSymbol name={item.icon || 'cube'} size={32} color={getRarityColor(item.rarity)} />
+        <IconSymbol 
+          name={item.weaponType ? 'sword' : 'shield'} 
+          size={32} 
+          color={getRarityColor(item)} 
+        />
       </View>
       <View style={styles.itemInfo}>
         <Text style={styles.itemName}>{item.name}</Text>
-        <Text style={[styles.itemRarity, { color: getRarityColor(item.rarity) }]}>
-          {item.rarity.toUpperCase()}
+        <Text style={[styles.itemType, { color: getRarityColor(item) }]}>
+          {item.weaponType ? getWeaponTypeDisplay(item.weaponType) : getArmorTypeDisplay(item.armorType)}
         </Text>
-        <Text style={styles.itemType}>{item.type}</Text>
       </View>
       <View style={styles.itemStats}>
-        {Object.entries(item.stats).map(([stat, value]) => (
-          <Text key={stat} style={styles.statText}>
-            {stat}: {value}
-          </Text>
+        {item.weaponType && (
+          <>
+            <Text style={styles.statText}>Cut: {item.cut || 0}</Text>
+            <Text style={styles.statText}>Blunt: {item.blunt || 0}</Text>
+          </>
+        )}
+        {item.armorType && (
+          <>
+            <Text style={styles.statText}>Cut Res: {item.cutResistance || 0}</Text>
+            <Text style={styles.statText}>Blunt Res: {item.bluntResistance || 0}</Text>
+          </>
+        )}
+        {item.elements && item.elements.map((element, index) => (
+          <Text key={index} style={styles.statText}>Element: {element.type}</Text>
         ))}
       </View>
     </TouchableOpacity>
@@ -171,50 +139,67 @@ export default function EquipmentScreen() {
 
           <ScrollView style={styles.detailContent}>
             <View style={styles.detailIconContainer}>
-              <View style={[styles.detailIcon, { backgroundColor: getRarityColor(selectedItem.rarity) }]}>
-                <IconSymbol name={selectedItem.icon || 'cube'} size={64} color="#fff" />
+              <View style={[styles.detailIcon, { backgroundColor: getRarityColor(selectedItem) }]}>
+                <IconSymbol 
+                  name={selectedItem.weaponType ? 'sword' : 'shield'} 
+                  size={64} 
+                  color="#fff" 
+                />
               </View>
-              <Text style={[styles.detailRarity, { color: getRarityColor(selectedItem.rarity) }]}>
-                {selectedItem.rarity.toUpperCase()}
+              <Text style={[styles.detailRarity, { color: getRarityColor(selectedItem) }]}>
+                {selectedItem.weaponType ? getWeaponTypeDisplay(selectedItem.weaponType) : getArmorTypeDisplay(selectedItem.armorType)}
               </Text>
             </View>
 
             <View style={styles.detailSection}>
-              <Text style={styles.sectionTitle}>Description</Text>
-              <Text style={styles.descriptionText}>{selectedItem.description || 'No description available'}</Text>
+              <Text style={styles.sectionTitle}>Properties</Text>
+              <Text style={styles.descriptionText}>
+                Category: {selectedItem.category}
+              </Text>
+              {selectedItem.weaponType && (
+                <Text style={styles.descriptionText}>
+                  Weapon Type: {getWeaponTypeDisplay(selectedItem.weaponType)}
+                </Text>
+              )}
+              {selectedItem.armorType && (
+                <Text style={styles.descriptionText}>
+                  Armor Type: {getArmorTypeDisplay(selectedItem.armorType)}
+                </Text>
+              )}
             </View>
 
             <View style={styles.detailSection}>
               <Text style={styles.sectionTitle}>Statistics</Text>
-              {selectedItem.stats && Object.entries(selectedItem.stats).map(([stat, value]) => (
-                <View key={stat} style={styles.detailStatRow}>
-                  <Text style={styles.statName}>{stat}</Text>
-                  <Text style={styles.statValue}>+{value}</Text>
+              {selectedItem.weaponType && (
+                <>
+                  <View style={styles.detailStatRow}>
+                    <Text style={styles.statName}>Cut Damage</Text>
+                    <Text style={styles.statValue}>{selectedItem.cut || 0}</Text>
+                  </View>
+                  <View style={styles.detailStatRow}>
+                    <Text style={styles.statName}>Blunt Damage</Text>
+                    <Text style={styles.statValue}>{selectedItem.blunt || 0}</Text>
+                  </View>
+                </>
+              )}
+              {selectedItem.armorType && (
+                <>
+                  <View style={styles.detailStatRow}>
+                    <Text style={styles.statName}>Cut Resistance</Text>
+                    <Text style={styles.statValue}>{selectedItem.cutResistance || 0}</Text>
+                  </View>
+                  <View style={styles.detailStatRow}>
+                    <Text style={styles.statName}>Blunt Resistance</Text>
+                    <Text style={styles.statValue}>{selectedItem.bluntResistance || 0}</Text>
+                  </View>
+                </>
+              )}
+              {selectedItem.elements && selectedItem.elements.map((element, index) => (
+                <View key={index} style={styles.detailStatRow}>
+                  <Text style={styles.statName}>Element</Text>
+                  <Text style={styles.statValue}>{element.type}</Text>
                 </View>
               ))}
-            </View>
-
-            {selectedItem.requirements && (
-              <View style={styles.detailSection}>
-                <Text style={styles.sectionTitle}>Requirements</Text>
-                {Object.entries(selectedItem.requirements).map(([req, value]) => (
-                  <View key={req} style={styles.requirementRow}>
-                    <Text style={styles.requirementText}>{req}: {value}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            <View style={styles.detailSection}>
-              <Text style={styles.sectionTitle}>Properties</Text>
-              <View style={styles.propertyRow}>
-                <Text style={styles.propertyLabel}>Type:</Text>
-                <Text style={styles.propertyValue}>{selectedItem.type}</Text>
-              </View>
-              <View style={styles.propertyRow}>
-                <Text style={styles.propertyLabel}>Category:</Text>
-                <Text style={styles.propertyValue}>{selectedItem.type}</Text>
-              </View>
             </View>
           </ScrollView>
         </View>
@@ -267,7 +252,7 @@ export default function EquipmentScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2C1810', // Dark medieval brown background
+    backgroundColor: '#2C1810',
   },
   header: {
     backgroundColor: '#1A0E08',
@@ -278,7 +263,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#F4E4C1', // Parchment color
+    color: '#F4E4C1',
     textAlign: 'center',
     textTransform: 'uppercase',
     letterSpacing: 2,
@@ -357,11 +342,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#F4E4C1',
     marginBottom: 4,
-  },
-  itemRarity: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginBottom: 2,
   },
   itemType: {
     fontSize: 12,
@@ -482,31 +462,6 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 14,
     color: '#4CAF50',
-    fontWeight: 'bold',
-  },
-  requirementRow: {
-    paddingVertical: 3,
-    borderBottomWidth: 1,
-    borderBottomColor: '#3E2723',
-  },
-  requirementText: {
-    fontSize: 14,
-    color: '#FF9800',
-  },
-  propertyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: '#3E2723',
-  },
-  propertyLabel: {
-    fontSize: 14,
-    color: '#A0826D',
-  },
-  propertyValue: {
-    fontSize: 14,
-    color: '#F4E4C1',
     fontWeight: 'bold',
   },
   loadingContainer: {

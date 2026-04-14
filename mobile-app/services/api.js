@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000/api'; // Update with your backend URL
+const API_BASE_URL = 'http://localhost:5000/api';
 
 class ApiService {
   constructor() {
@@ -46,11 +46,10 @@ class ApiService {
     }
   }
 
-  // Authentication endpoints - TO BE IMPLEMENTED BY BACKEND
-  async login(email, password) {
+  async login(username, password) {
     return this.request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
     });
   }
 
@@ -61,59 +60,67 @@ class ApiService {
     });
   }
 
-  async resetPassword(email) {
+  async resetPassword(oldPassword, newPassword) {
     return this.request('/auth/reset-password', {
       method: 'POST',
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ oldPassword, newPassword }),
     });
   }
 
-  async logout() {
+  async logout(refreshToken) {
     return this.request('/auth/logout', {
       method: 'POST',
+      body: JSON.stringify(refreshToken),
     });
   }
 
-  // User endpoints - TO BE IMPLEMENTED BY BACKEND
+  async refreshToken(refreshToken) {
+    return this.request('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify(refreshToken),
+    });
+  }
+
   async getUserProfile() {
-    return this.request('/user/profile');
+    return this.request('/auth/me');
   }
 
-  async updateProfile(userData) {
-    return this.request('/user/profile', {
-      method: 'PUT',
-      body: JSON.stringify(userData),
-    });
+  async getMobileProfile() {
+    return this.request('/mobile/me');
   }
 
-  // Game endpoints - TO BE IMPLEMENTED BY BACKEND
   async getEquipment() {
-    return this.request('/game/equipment');
-  }
-
-  async getStats() {
-    return this.request('/game/stats');
+    return this.request('/mobile/items');
   }
 
   async claimDailyReward() {
-    return this.request('/game/daily-reward', {
+    return this.request('/mobile/daily', {
       method: 'POST',
     });
   }
 
-  async getDailyRewardStatus() {
-    return this.request('/game/daily-reward/status');
+  async getMarketListings(category = null, pageNumber = 1, pageSize = 20, sort = 'asc') {
+    const params = new URLSearchParams({
+      pageNumber: pageNumber.toString(),
+      pageSize: pageSize.toString(),
+      sort: sort,
+      ...(category && { category: category }),
+    });
+    
+    return this.request(`/market/listing?${params}`);
   }
 
-  async startBattle(botDifficulty = 'normal') {
-    return this.request('/game/battle', {
+  async createMarketListing(listingData) {
+    return this.request('/market/sell', {
       method: 'POST',
-      body: JSON.stringify({ botDifficulty }),
+      body: JSON.stringify(listingData),
     });
   }
 
-  async getBattleHistory() {
-    return this.request('/game/battle-history');
+  async buyMarketItem(itemId) {
+    return this.request(`/market/${itemId}/buy`, {
+      method: 'POST',
+    });
   }
 }
 

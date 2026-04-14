@@ -8,29 +8,26 @@ class AuthService {
     this.tokenRefreshInterval = null;
   }
 
-  async login(email, password) {
+  async login(username, password) {
     try {
-      const response = await api.login(email, password);
-      const { token, refreshToken, user } = response;
+      const response = await api.login(username, password);
+      const { token, refreshToken } = response;
       
-      // Store tokens and user data securely
       await AsyncStorage.setItem('authToken', token);
       if (refreshToken) {
         await AsyncStorage.setItem('refreshToken', refreshToken);
       }
-      await AsyncStorage.setItem('userData', JSON.stringify(user));
       
-      // Update API service with tokens
       api.setToken(token, refreshToken);
       
-      // Update local state
-      this.user = user;
+      const profileResponse = await api.getUserProfile();
+      this.user = profileResponse;
       this.isAuthenticated = true;
+      await AsyncStorage.setItem('userData', JSON.stringify(profileResponse));
       
-      // Start token refresh monitoring
       this.startTokenRefreshMonitoring();
       
-      return { success: true, user };
+      return { success: true, user: profileResponse };
     } catch (error) {
       console.error('Login error:', error);
       return { success: false, error: error.message };
@@ -40,17 +37,17 @@ class AuthService {
   async register(userData) {
     try {
       const response = await api.register(userData);
-      return { success: true, message: response.message };
+      return { success: true, message: 'Registration successful' };
     } catch (error) {
       console.error('Registration error:', error);
       return { success: false, error: error.message };
     }
   }
 
-  async resetPassword(email) {
+  async resetPassword(oldPassword, newPassword) {
     try {
-      const response = await api.resetPassword(email);
-      return { success: true, message: response.message };
+      const response = await api.resetPassword(oldPassword, newPassword);
+      return { success: true, message: response };
     } catch (error) {
       console.error('Password reset error:', error);
       return { success: false, error: error.message };
@@ -58,22 +55,17 @@ class AuthService {
   }
 
   startTokenRefreshMonitoring() {
-    // Clear any existing interval
     if (this.tokenRefreshInterval) {
       clearInterval(this.tokenRefreshInterval);
     }
     
-    // Check token validity every 5 minutes
     this.tokenRefreshInterval = setInterval(async () => {
       try {
-        // Make a lightweight request to check if token is still valid
         await api.getUserProfile();
       } catch (error) {
         console.log('Token validation failed, attempting refresh');
-        // The API service will handle token refresh automatically
-        // If refresh fails, the user will need to login again
       }
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 5 * 60 * 1000);
   }
 
   stopTokenRefreshMonitoring() {
@@ -85,21 +77,20 @@ class AuthService {
 
   async logout() {
     try {
-      // Stop token refresh monitoring
+      const refreshToken = await AsyncStorage.getItem('refreshToken');
+      
       this.stopTokenRefreshMonitoring();
       
-      // Call logout endpoint
-      await api.logout();
+      if (refreshToken) {
+        await api.logout(refreshToken);
+      }
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Clear all auth data from storage
       await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'userData']);
       
-      // Clear API tokens
       api.setToken(null, null);
       
-      // Reset local state
       this.user = null;
       this.isAuthenticated = false;
     }
@@ -112,18 +103,15 @@ class AuthService {
       const userData = await AsyncStorage.getItem('userData');
       
       if (token && userData) {
-        // Validate token format (basic check)
         if (token.startsWith('eyJ') && token.includes('.')) {
           api.setToken(token, refreshToken);
           this.user = JSON.parse(userData);
           this.isAuthenticated = true;
           
-          // Start token refresh monitoring
           this.startTokenRefreshMonitoring();
           
           return true;
         } else {
-          // Invalid token format, clear storage
           await AsyncStorage.multiRemove(['authToken', 'refreshToken']);
         }
       }
@@ -136,12 +124,31 @@ class AuthService {
 
   async updateUserProfile(userData) {
     try {
-      const response = await api.updateProfile(userData);
-      this.user = { ...this.user, ...response.user };
-      await AsyncStorage.setItem('userData', JSON.stringify(this.user));
-      return { success: true, user: this.user };
+      return { success: false, error: 'Profile update not available yet' };
     } catch (error) {
       console.error('Profile update error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async refreshToken() {
+    try {
+      const refreshToken = await AsyncStorage.getItem('refreshToken');
+      if (!refreshToken) {
+        throw new Error('No refresh token available');
+      }
+
+      const response = await api.refreshToken(refreshToken);
+      const { token, refreshToken: newRefreshToken } = response;
+      
+      await AsyncStorage.setItem('authToken', token);
+      await AsyncStorage.setItem('refreshToken', newRefreshToken);
+      
+      api.setToken(token, newRefreshToken);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Token refresh error:', error);
       return { success: false, error: error.message };
     }
   }
@@ -152,6 +159,36 @@ class AuthService {
 
   isUserAuthenticated() {
     return this.isAuthenticated;
+  }
+
+  async getMobileProfile() {
+    try {
+      const response = await api.getMobileProfile();
+      return { success: true, data: response };
+    } catch (error) {
+      console.error('Mobile profile error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getEquipment() {
+    try {
+      const response = await api.getEquipment();
+      return { success: true, data: response };
+    } catch (error) {
+      console.error('Equipment error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async claimDailyReward() {
+    try {
+      const response = await api.claimDailyReward();
+      return { success: true, data: response };
+    } catch (error) {
+      console.error('Daily reward error:', error);
+      return { success: false, error: error.message };
+    }
   }
 }
 
