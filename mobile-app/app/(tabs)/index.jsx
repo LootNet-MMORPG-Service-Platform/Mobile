@@ -56,7 +56,7 @@ export default function HomeScreen() {
             <Text style={styles.actionTitle}>Equipment</Text>
             <Text style={styles.actionSubtitle}>Review generated loot</Text>
           </View>
-          <IconSymbol name="chevron.right" size={22} color="#A0826D" />
+          <IconSymbol name="chevron.right" size={22} color="#D7C0A5" />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/(tabs)/rewards')}>
@@ -65,7 +65,7 @@ export default function HomeScreen() {
             <Text style={styles.actionTitle}>Daily Reward</Text>
             <Text style={styles.actionSubtitle}>Generate today&apos;s item</Text>
           </View>
-          <IconSymbol name="chevron.right" size={22} color="#A0826D" />
+          <IconSymbol name="chevron.right" size={22} color="#D7C0A5" />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/(tabs)/battle')}>
@@ -74,7 +74,16 @@ export default function HomeScreen() {
             <Text style={styles.actionTitle}>Battle</Text>
             <Text style={styles.actionSubtitle}>Practice with local bots</Text>
           </View>
-          <IconSymbol name="chevron.right" size={22} color="#A0826D" />
+          <IconSymbol name="chevron.right" size={22} color="#D7C0A5" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/(tabs)/market')}>
+          <IconSymbol name="store" size={24} color="#F4E4C1" />
+          <View style={styles.actionText}>
+            <Text style={styles.actionTitle}>Marketplace</Text>
+            <Text style={styles.actionSubtitle}>Buy and sell player gear</Text>
+          </View>
+          <IconSymbol name="chevron.right" size={22} color="#D7C0A5" />
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -101,8 +110,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   subtitle: {
-    color: '#A0826D',
-    fontSize: 15,
+    color: '#D7C0A5',
+    fontSize: 18,
     marginTop: 6,
   },
   statsRow: {
@@ -126,8 +135,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   statLabel: {
-    color: '#A0826D',
-    fontSize: 13,
+    color: '#D7C0A5',
+    fontSize: 16,
     marginTop: 4,
   },
   actions: {
@@ -150,12 +159,12 @@ const styles = StyleSheet.create({
   },
   actionTitle: {
     color: '#F4E4C1',
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: 'bold',
   },
   actionSubtitle: {
-    color: '#A0826D',
-    fontSize: 13,
+    color: '#D7C0A5',
+    fontSize: 16,
     marginTop: 2,
   },
 });

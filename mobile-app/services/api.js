@@ -21,7 +21,7 @@ const resolveApiBaseUrl = () => {
   const configuredUsesLocalhost =
     configuredUrl?.includes('localhost') || configuredUrl?.includes('127.0.0.1');
 
-  if (Platform.OS !== 'web' && configuredUsesLocalhost) {
+  if (Platform.OS !== 'web' && (!configuredUrl || configuredUsesLocalhost)) {
     const expoHost = getExpoHost();
 
     if (expoHost && expoHost !== 'localhost' && expoHost !== '127.0.0.1') {
@@ -43,11 +43,21 @@ class ApiService {
     this.baseURL = API_BASE_URL;
     this.token = null;
     this.refreshTokenValue = null;
+    this.onAuthExpired = null;
+    this.onTokenRefresh = null;
   }
 
   setToken(token, refreshToken = null) {
     this.token = token;
     this.refreshTokenValue = refreshToken;
+  }
+
+  setAuthExpiredHandler(handler) {
+    this.onAuthExpired = handler;
+  }
+
+  setTokenRefreshHandler(handler) {
+    this.onTokenRefresh = handler;
   }
 
   getHeaders() {
@@ -76,7 +86,38 @@ class ApiService {
     }
   }
 
-  async request(endpoint, options = {}) {
+  async refreshAccessToken() {
+    if (!this.refreshTokenValue) {
+      return false;
+    }
+
+    try {
+      const response = await fetch(`${this.baseURL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(this.refreshTokenValue),
+      });
+
+      const data = await this.parseResponse(response);
+
+      if (!response.ok || !data?.token) {
+        return false;
+      }
+
+      this.setToken(data.token, data.refreshToken || this.refreshTokenValue);
+      if (this.onTokenRefresh) {
+        await this.onTokenRefresh(data);
+      }
+      return data;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      return false;
+    }
+  }
+
+  async request(endpoint, options = {}, retryOnUnauthorized = true) {
     const url = `${this.baseURL}${endpoint}`;
     const config = {
       headers: this.getHeaders(),
@@ -87,11 +128,24 @@ class ApiService {
       const response = await fetch(url, config);
       const data = await this.parseResponse(response);
 
+      if (response.status === 401 && retryOnUnauthorized && this.refreshTokenValue) {
+        const refreshResult = await this.refreshAccessToken();
+
+        if (refreshResult?.token) {
+          return this.request(endpoint, options, false);
+        }
+      }
+
       if (!response.ok) {
         const message =
           typeof data === 'string'
             ? data
             : data?.message || data?.title || `API request failed (${response.status})`;
+
+        if (response.status === 401 && this.onAuthExpired) {
+          await this.onAuthExpired();
+        }
+
         throw new Error(message);
       }
 
@@ -138,7 +192,7 @@ class ApiService {
     return this.request('/auth/refresh', {
       method: 'POST',
       body: JSON.stringify(refreshToken),
-    });
+    }, false);
   }
 
   async getUserProfile() {

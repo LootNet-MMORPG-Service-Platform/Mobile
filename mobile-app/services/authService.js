@@ -6,6 +6,15 @@ class AuthService {
     this.user = null;
     this.isAuthenticated = false;
     this.tokenRefreshInterval = null;
+    api.setAuthExpiredHandler(() => {
+      this.clearLocalAuth();
+    });
+    api.setTokenRefreshHandler(async ({ token, refreshToken }) => {
+      await Storage.setItem('authToken', token);
+      if (refreshToken) {
+        await Storage.setItem('refreshToken', refreshToken);
+      }
+    });
   }
 
   async login(username, password) {
@@ -61,9 +70,9 @@ class AuthService {
     
     this.tokenRefreshInterval = setInterval(async () => {
       try {
-        await api.getUserProfile();
+        await api.refreshAccessToken();
       } catch (_error) {
-        console.log('Token validation failed, attempting refresh');
+        console.log('Token refresh failed');
       }
     }, 5 * 60 * 1000);
   }
@@ -73,6 +82,14 @@ class AuthService {
       clearInterval(this.tokenRefreshInterval);
       this.tokenRefreshInterval = null;
     }
+  }
+
+  async clearLocalAuth() {
+    this.stopTokenRefreshMonitoring();
+    await Storage.multiRemove(['authToken', 'refreshToken', 'userData']);
+    api.setToken(null, null);
+    this.user = null;
+    this.isAuthenticated = false;
   }
 
   async logout() {
@@ -87,12 +104,7 @@ class AuthService {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      await Storage.multiRemove(['authToken', 'refreshToken', 'userData']);
-      
-      api.setToken(null, null);
-      
-      this.user = null;
-      this.isAuthenticated = false;
+      await this.clearLocalAuth();
     }
   }
 
@@ -182,6 +194,36 @@ class AuthService {
       return { success: true, data: response };
     } catch (error) {
       console.error('Daily reward error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getMarketListings(category = null, pageNumber = 1, pageSize = 20, sort = 'asc') {
+    try {
+      const response = await api.getMarketListings(category, pageNumber, pageSize, sort);
+      return { success: true, data: response };
+    } catch (error) {
+      console.error('Marketplace listings error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async createMarketListing(itemId, price) {
+    try {
+      const response = await api.createMarketListing({ itemId, price: Number(price) });
+      return { success: true, data: response };
+    } catch (error) {
+      console.error('Create market listing error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async buyMarketItem(listingId) {
+    try {
+      const response = await api.buyMarketItem(listingId);
+      return { success: true, data: response };
+    } catch (error) {
+      console.error('Buy market item error:', error);
       return { success: false, error: error.message };
     }
   }

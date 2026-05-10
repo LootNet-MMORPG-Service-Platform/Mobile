@@ -117,8 +117,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   subtitle: {
-    fontSize: 15,
-    color: '#A0826D',
+    fontSize: 18,
+    color: '#D7C0A5',
     textAlign: 'center',
     marginTop: 6,
   },
@@ -147,8 +147,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   rewardDescription: {
-    color: '#A0826D',
-    fontSize: 15,
+    color: '#D7C0A5',
+    fontSize: 18,
     textAlign: 'center',
     marginTop: 8,
   },
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   },
   claimButtonText: {
     color: '#F4E4C1',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     textTransform: 'uppercase',
   },
@@ -180,14 +180,14 @@ const styles = StyleSheet.create({
     borderColor: '#8B7355',
   },
   infoTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#F4E4C1',
     marginBottom: 10,
   },
   infoText: {
-    color: '#A0826D',
-    fontSize: 14,
+    color: '#D7C0A5',
+    fontSize: 16,
     marginBottom: 6,
   },
 });

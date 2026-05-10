@@ -72,11 +72,11 @@ export default function ResetPasswordScreen() {
         </View>
 
         <View style={styles.inputContainer}>
-          <IconSymbol name="lock" size={20} color="#A0826D" />
+          <IconSymbol name="lock" size={20} color="#D7C0A5" />
           <TextInput
             style={styles.input}
             placeholder="Current password"
-            placeholderTextColor="#A0826D"
+            placeholderTextColor="#D7C0A5"
             value={oldPassword}
             onChangeText={setOldPassword}
             secureTextEntry
@@ -84,11 +84,11 @@ export default function ResetPasswordScreen() {
         </View>
 
         <View style={styles.inputContainer}>
-          <IconSymbol name="lock.reset" size={20} color="#A0826D" />
+          <IconSymbol name="lock.reset" size={20} color="#D7C0A5" />
           <TextInput
             style={styles.input}
             placeholder="New password"
-            placeholderTextColor="#A0826D"
+            placeholderTextColor="#D7C0A5"
             value={newPassword}
             onChangeText={setNewPassword}
             secureTextEntry
@@ -96,11 +96,11 @@ export default function ResetPasswordScreen() {
         </View>
 
         <View style={styles.inputContainer}>
-          <IconSymbol name="checkmark" size={20} color="#A0826D" />
+          <IconSymbol name="checkmark" size={20} color="#D7C0A5" />
           <TextInput
             style={styles.input}
             placeholder="Confirm new password"
-            placeholderTextColor="#A0826D"
+            placeholderTextColor="#D7C0A5"
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   },
   backText: {
     color: '#F4E4C1',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   header: {
@@ -157,8 +157,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   subtitle: {
-    fontSize: 15,
-    color: '#A0826D',
+    fontSize: 18,
+    color: '#D7C0A5',
     marginTop: 6,
   },
   inputContainer: {
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 50,
     color: '#F4E4C1',
-    fontSize: 16,
+    fontSize: 18,
     marginLeft: 10,
   },
   button: {
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#F4E4C1',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     textTransform: 'uppercase',
   },

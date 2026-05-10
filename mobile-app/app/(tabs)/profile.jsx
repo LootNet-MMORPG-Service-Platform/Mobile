@@ -185,7 +185,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#ECE7DF',
   },
   header: {
     backgroundColor: '#007AFF',
@@ -216,17 +216,17 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   email: {
-    fontSize: 16,
+    fontSize: 18,
     color: 'rgba(255,255,255,0.8)',
     marginBottom: 5,
   },
   level: {
-    fontSize: 14,
+    fontSize: 17,
     color: 'rgba(255,255,255,0.7)',
     fontWeight: 'bold',
   },
   statsContainer: {
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     margin: 20,
     borderRadius: 12,
     padding: 20,
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1F130D',
     marginBottom: 15,
   },
   statsGrid: {
@@ -253,16 +253,16 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1F130D',
     marginTop: 8,
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 15,
+    color: '#3E2E25',
   },
   menuContainer: {
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     margin: 20,
     marginTop: 0,
     borderRadius: 12,
@@ -290,13 +290,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   menuTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1F130D',
   },
   menuSubtitle: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 16,
+    color: '#3E2E25',
     marginTop: 2,
   },
   logoutContainer: {
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
   },
   logoutButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 8,
   },
@@ -330,12 +330,12 @@ const styles = StyleSheet.create({
     paddingVertical: 30,
   },
   version: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 16,
+    color: '#3E2E25',
     marginBottom: 5,
   },
   copyright: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#999',
   },
 });

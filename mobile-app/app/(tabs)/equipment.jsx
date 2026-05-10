@@ -278,8 +278,8 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#A0826D',
+    fontSize: 17,
+    color: '#D7C0A5',
     textAlign: 'center',
     marginTop: 5,
     fontStyle: 'italic',
@@ -305,8 +305,8 @@ const styles = StyleSheet.create({
     borderColor: '#F4E4C1',
   },
   categoryButtonText: {
-    color: '#A0826D',
-    fontSize: 12,
+    color: '#D7C0A5',
+    fontSize: 15,
     fontWeight: 'bold',
     textTransform: 'uppercase',
   },
@@ -347,21 +347,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#F4E4C1',
     marginBottom: 4,
   },
   itemType: {
-    fontSize: 12,
-    color: '#A0826D',
+    fontSize: 15,
+    color: '#D7C0A5',
     fontStyle: 'italic',
   },
   itemStats: {
     alignItems: 'flex-start',
   },
   statText: {
-    fontSize: 11,
+    fontSize: 14,
     color: '#F4E4C1',
     marginBottom: 2,
   },
@@ -451,8 +451,8 @@ const styles = StyleSheet.create({
     paddingBottom: 5,
   },
   descriptionText: {
-    fontSize: 14,
-    color: '#A0826D',
+    fontSize: 16,
+    color: '#D7C0A5',
     lineHeight: 20,
     fontStyle: 'italic',
   },
@@ -464,12 +464,12 @@ const styles = StyleSheet.create({
     borderBottomColor: '#3E2723',
   },
   statName: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#F4E4C1',
     fontWeight: 'bold',
   },
   statValue: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#4CAF50',
     fontWeight: 'bold',
   },
@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#F4E4C1',
   },
 });

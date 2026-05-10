@@ -359,7 +359,7 @@ export default function BattleScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#ECE7DF',
   },
   header: {
     padding: 20,
@@ -368,12 +368,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1F130D',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 18,
+    color: '#3E2E25',
     textAlign: 'center',
   },
   battleSetup: {
@@ -382,14 +382,14 @@ const styles = StyleSheet.create({
   setupTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1F130D',
     textAlign: 'center',
     marginBottom: 30,
   },
   difficultyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 20,
     marginBottom: 15,
@@ -406,11 +406,11 @@ const styles = StyleSheet.create({
   difficultyName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1F130D',
   },
   difficultyDesc: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 16,
+    color: '#3E2E25',
     marginTop: 4,
   },
   battleArena: {
@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
   battleTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1F130D',
     marginBottom: 5,
   },
   turnIndicator: {
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
   },
   combatant: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 20,
     alignItems: 'center',
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
   combatantName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1F130D',
     marginTop: 8,
   },
   healthBarContainer: {
@@ -488,8 +488,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     textAlign: 'center',
     textAlignVertical: 'center',
-    fontSize: 12,
-    color: '#333',
+    fontSize: 14,
+    color: '#1F130D',
     fontWeight: 'bold',
   },
   vsContainer: {
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
   vsText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#666',
+    color: '#3E2E25',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -520,14 +520,14 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: 'bold',
     marginLeft: 8,
   },
   battleResult: {
     alignItems: 'center',
     padding: 30,
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     marginBottom: 20,
     shadowColor: '#000',
@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   battleLogContainer: {
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 15,
     maxHeight: 150,
@@ -573,17 +573,17 @@ const styles = StyleSheet.create({
   logTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1F130D',
     marginBottom: 10,
   },
   logEntry: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 16,
+    color: '#3E2E25',
     marginBottom: 5,
   },
   historyContainer: {
     margin: 20,
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 20,
     shadowColor: '#000',
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
   historyTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1F130D',
     marginBottom: 15,
   },
   historyItem: {
@@ -612,11 +612,11 @@ const styles = StyleSheet.create({
   },
   historyOpponent: {
     fontSize: 16,
-    color: '#333',
+    color: '#1F130D',
     marginLeft: 8,
   },
   historyDate: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 16,
+    color: '#3E2E25',
   },
 });

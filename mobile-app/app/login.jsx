@@ -58,7 +58,7 @@ export default function LoginScreen() {
 
         <View style={styles.form}>
           <View style={styles.inputContainer}>
-            <IconSymbol name="person" size={20} color="#A0826D" />
+          <IconSymbol name="person" size={20} color="#D7C0A5" />
             <TextInput
               style={styles.input}
               placeholder="Username"
@@ -71,7 +71,7 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.inputContainer}>
-            <IconSymbol name="lock" size={20} color="#A0826D" />
+            <IconSymbol name="lock" size={20} color="#D7C0A5" />
             <TextInput
               style={styles.input}
               placeholder="Password"
@@ -88,7 +88,7 @@ export default function LoginScreen() {
               <IconSymbol 
                 name={showPassword ? "eye.slash" : "eye"} 
                 size={20} 
-                color="#A0826D" 
+                color="#D7C0A5" 
               />
             </TouchableOpacity>
           </View>
@@ -137,8 +137,8 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#A0826D',
+    fontSize: 18,
+    color: '#D7C0A5',
     marginTop: 5,
     fontStyle: 'italic',
   },
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 50,
     color: '#F4E4C1',
-    fontSize: 16,
+    fontSize: 18,
     marginLeft: 10,
   },
   eyeIcon: {
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   },
   loginButtonText: {
     color: '#F4E4C1',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     textTransform: 'uppercase',
   },
@@ -194,8 +194,8 @@ const styles = StyleSheet.create({
     marginTop: 30,
   },
   footerLink: {
-    color: '#A0826D',
-    fontSize: 14,
+    color: '#D7C0A5',
+    fontSize: 16,
     textDecorationLine: 'underline',
   },
 });
