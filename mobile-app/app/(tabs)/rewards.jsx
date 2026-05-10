@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,40 +9,35 @@ import {
   RefreshControl,
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import api from '../../services/api';
+import authService from '../../services/authService';
 
 export default function RewardsScreen() {
-  const [dailyReward, setDailyReward] = useState(null);
-  const [canClaim, setCanClaim] = useState(false);
+  const [lastReward, setLastReward] = useState(null);
+  const [alreadyClaimed, setAlreadyClaimed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    checkDailyRewardStatus();
-  }, []);
-
-  const checkDailyRewardStatus = async () => {
-    try {
-      const response = await api.get('/game/daily-reward/status');
-      setDailyReward(response.reward);
-      setCanClaim(response.canClaim);
-    } catch (error) {
-      console.error('Error checking daily reward status:', error);
-    }
-  };
-
   const claimDailyReward = async () => {
-    if (!canClaim) return;
-
     setIsLoading(true);
     try {
-      const response = await api.claimDailyReward();
-      Alert.alert(
-        'Daily Reward Claimed!',
-        `You received: ${response.reward.description}`,
-        [{ text: 'OK', onPress: () => checkDailyRewardStatus() }]
-      );
-    } catch (error) {
+      const result = await authService.claimDailyReward();
+
+      if (result.success) {
+        setLastReward(result.data);
+        setAlreadyClaimed(false);
+        Alert.alert('Daily Reward Claimed!', `You received ${result.data?.name || 'a new item'}.`);
+      } else if (result.error?.toLowerCase().includes('already claimed')) {
+        setAlreadyClaimed(true);
+        Alert.alert('Already Claimed', 'Your next daily reward will be available tomorrow.');
+      } else if (result.error?.toLowerCase().includes('profile')) {
+        Alert.alert(
+          'Reward Not Ready',
+          'Your account is missing a loot generation profile. Ask the backend team to assign one before claiming rewards.'
+        );
+      } else {
+        Alert.alert('Error', result.error || 'Failed to claim daily reward');
+      }
+    } catch (_error) {
       Alert.alert('Error', 'Failed to claim daily reward');
     } finally {
       setIsLoading(false);
@@ -51,128 +46,52 @@ export default function RewardsScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await checkDailyRewardStatus();
     setRefreshing(false);
-  };
-
-  const renderRewardCalendar = () => {
-    const days = [];
-    const currentDay = new Date().getDate();
-    
-    for (let i = 1; i <= 30; i++) {
-      const isClaimed = i < currentDay;
-      const isToday = i === currentDay;
-      const canClaimToday = isToday && canClaim;
-      
-      days.push(
-        <View
-          key={i}
-          style={[
-            styles.dayBox,
-            isClaimed && styles.dayClaimed,
-            isToday && styles.dayToday,
-            canClaimToday && styles.dayCanClaim,
-          ]}
-        >
-          <Text
-            style={[
-              styles.dayNumber,
-              isClaimed && styles.dayNumberClaimed,
-              isToday && styles.dayNumberToday,
-            ]}
-          >
-            {i}
-          </Text>
-          {isClaimed && <IconSymbol name="checkmark" size={16} color="#fff" />}
-          {canClaimToday && (
-            <IconSymbol name="gift" size={16} color="#007AFF" />
-          )}
-        </View>
-      );
-    }
-    
-    return days;
   };
 
   return (
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F4E4C1" />
       }
     >
       <View style={styles.header}>
-        <Text style={styles.title}>Daily Rewards</Text>
-        <Text style={styles.subtitle}>
-          Claim your rewards every day to build your streak!
+        <IconSymbol name="gift" size={42} color="#D6A84F" />
+        <Text style={styles.title}>Daily Reward</Text>
+        <Text style={styles.subtitle}>Claim once per day to generate a new piece of loot.</Text>
+      </View>
+
+      <View style={styles.rewardPanel}>
+        <View style={styles.rewardIcon}>
+          <IconSymbol name={lastReward?.weaponType !== undefined ? 'sword' : 'shield'} size={54} color="#2C1810" />
+        </View>
+        <Text style={styles.rewardName}>{lastReward?.name || 'Mystery Loot'}</Text>
+        <Text style={styles.rewardDescription}>
+          {lastReward
+            ? `Category: ${lastReward.category ?? 'Item'}`
+            : alreadyClaimed
+              ? 'You have already claimed today.'
+              : 'A generated item will be added to your equipment.'}
         </Text>
       </View>
 
-      <View style={styles.streakContainer}>
-        <View style={styles.streakItem}>
-          <IconSymbol name="flame" size={24} color="#FF6B6B" />
-          <Text style={styles.streakLabel}>Current Streak</Text>
-          <Text style={styles.streakValue}>{dailyReward?.currentStreak || 0} days</Text>
-        </View>
-        <View style={styles.streakItem}>
-          <IconSymbol name="calendar" size={24} color="#4ECDC4" />
-          <Text style={styles.streakLabel}>Next Reward</Text>
-          <Text style={styles.streakValue}>
-            {canClaim ? 'Available!' : 'Tomorrow'}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.calendarContainer}>
-        <Text style={styles.calendarTitle}>Reward Calendar</Text>
-        <View style={styles.calendarGrid}>
-          {renderRewardCalendar()}
-        </View>
-      </View>
-
-      {dailyReward && (
-        <View style={styles.rewardInfoContainer}>
-          <Text style={styles.rewardTitle}>Today's Reward</Text>
-          <View style={styles.rewardItem}>
-            <IconSymbol name="gift" size={32} color="#FFD93D" />
-            <View style={styles.rewardDetails}>
-              <Text style={styles.rewardName}>{dailyReward.name}</Text>
-              <Text style={styles.rewardDescription}>
-                {dailyReward.description}
-              </Text>
-            </View>
-          </View>
-        </View>
-      )}
-
       <TouchableOpacity
-        style={[
-          styles.claimButton,
-          !canClaim && styles.claimButtonDisabled,
-          isLoading && styles.claimButtonLoading,
-        ]}
+        style={[styles.claimButton, isLoading && styles.claimButtonDisabled]}
         onPress={claimDailyReward}
-        disabled={!canClaim || isLoading}
+        disabled={isLoading}
       >
+        <IconSymbol name="gift" size={20} color="#F4E4C1" />
         <Text style={styles.claimButtonText}>
-          {isLoading ? 'Claiming...' : canClaim ? 'Claim Daily Reward' : 'Already Claimed'}
+          {isLoading ? 'Claiming...' : alreadyClaimed ? 'Check Reward' : 'Claim Daily Reward'}
         </Text>
       </TouchableOpacity>
 
       <View style={styles.infoContainer}>
-        <Text style={styles.infoTitle}>How it works:</Text>
-        <Text style={styles.infoText}>
-          {'\u2022 Claim rewards daily to maintain your streak'}
-        </Text>
-        <Text style={styles.infoText}>
-          {'\u2022 Higher streaks mean better rewards'}
-        </Text>
-        <Text style={styles.infoText}>
-          {'\u2022 Missing a day resets your streak'}
-        </Text>
-        <Text style={styles.infoText}>
-          {'\u2022 Rewards refresh every 24 hours'}
-        </Text>
+        <Text style={styles.infoTitle}>Reward Rules</Text>
+        <Text style={styles.infoText}>One reward can be claimed each UTC day.</Text>
+        <Text style={styles.infoText}>The backend generates either a weapon or armor item.</Text>
+        <Text style={styles.infoText}>New rewards appear in the Equipment tab after claiming.</Text>
       </View>
     </ScrollView>
   );
@@ -181,183 +100,94 @@ export default function RewardsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#2C1810',
   },
   header: {
-    padding: 20,
     alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#1A0E08',
+    borderBottomWidth: 2,
+    borderBottomColor: '#8B7355',
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+    color: '#F4E4C1',
+    marginTop: 10,
+    textTransform: 'uppercase',
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 15,
+    color: '#A0826D',
     textAlign: 'center',
+    marginTop: 6,
   },
-  streakContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginHorizontal: 20,
-    marginBottom: 20,
-  },
-  streakItem: {
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    flex: 1,
-    marginHorizontal: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  streakLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 8,
-  },
-  streakValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 4,
-  },
-  calendarContainer: {
+  rewardPanel: {
     margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  calendarTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
-  },
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  dayBox: {
-    width: '14%',
-    aspectRatio: 1,
-    backgroundColor: '#f0f0f0',
+    padding: 24,
+    alignItems: 'center',
+    backgroundColor: '#3E2723',
     borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#8B7355',
   },
-  dayClaimed: {
-    backgroundColor: '#4ECDC4',
-    borderColor: '#4ECDC4',
-  },
-  dayToday: {
-    borderColor: '#007AFF',
-    borderWidth: 2,
-  },
-  dayCanClaim: {
-    backgroundColor: '#E3F2FD',
-    borderColor: '#007AFF',
-  },
-  dayNumber: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  dayNumberClaimed: {
-    color: '#fff',
-  },
-  dayNumberToday: {
-    color: '#007AFF',
-  },
-  rewardInfoContainer: {
-    margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  rewardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
-  },
-  rewardItem: {
-    flexDirection: 'row',
+  rewardIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 8,
     alignItems: 'center',
-  },
-  rewardDetails: {
-    marginLeft: 15,
-    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: '#D6A84F',
+    marginBottom: 18,
   },
   rewardName: {
-    fontSize: 16,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#F4E4C1',
+    textAlign: 'center',
   },
   rewardDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
+    color: '#A0826D',
+    fontSize: 15,
+    textAlign: 'center',
+    marginTop: 8,
   },
   claimButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    padding: 18,
     marginHorizontal: 20,
+    height: 54,
+    borderRadius: 8,
+    backgroundColor: '#8B7355',
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   claimButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  claimButtonLoading: {
-    backgroundColor: '#0056b3',
+    backgroundColor: '#654321',
   },
   claimButtonText: {
-    color: 'white',
-    fontSize: 18,
+    color: '#F4E4C1',
+    fontSize: 16,
     fontWeight: 'bold',
+    textTransform: 'uppercase',
   },
   infoContainer: {
     margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    padding: 18,
+    backgroundColor: '#1A0E08',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#8B7355',
   },
   infoTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#F4E4C1',
     marginBottom: 10,
   },
   infoText: {
+    color: '#A0826D',
     fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
+    marginBottom: 6,
   },
 });

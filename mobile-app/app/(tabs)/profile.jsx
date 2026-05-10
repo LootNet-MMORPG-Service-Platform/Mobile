@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,16 +6,28 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
-  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useAuth } from '../../contexts/AuthContext';
 import authService from '../../services/authService';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const [user] = useState(authService.getUser());
+  const { user, logout } = useAuth();
+  const [profile, setProfile] = useState(user);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      const result = await authService.getMobileProfile();
+      if (result.success) {
+        setProfile(result.data);
+      }
+    };
+
+    loadProfile();
+  }, []);
 
   const handleLogout = async () => {
     Alert.alert(
@@ -32,9 +44,9 @@ export default function ProfileScreen() {
           onPress: async () => {
             setIsLoading(true);
             try {
-              await authService.logout();
+              await logout();
               router.replace('/login');
-            } catch (error) {
+            } catch (_error) {
               Alert.alert('Error', 'Failed to logout');
             } finally {
               setIsLoading(false);
@@ -50,31 +62,31 @@ export default function ProfileScreen() {
       icon: 'person.fill',
       title: 'Account Settings',
       subtitle: 'Update your profile information',
-      onPress: () => router.push('/profile/settings'),
+      onPress: () => Alert.alert('Coming Soon', 'Profile editing is not available in the API yet.'),
     },
     {
       icon: 'shield',
       title: 'Security',
       subtitle: 'Manage password and security settings',
-      onPress: () => router.push('/profile/security'),
+      onPress: () => router.push('/reset-password'),
     },
     {
       icon: 'bell',
       title: 'Notifications',
       subtitle: 'Configure app notifications',
-      onPress: () => router.push('/profile/notifications'),
+      onPress: () => Alert.alert('Coming Soon', 'Notification settings are not available yet.'),
     },
     {
       icon: 'questionmark.circle',
       title: 'Help & Support',
       subtitle: 'Get help with the app',
-      onPress: () => router.push('/profile/help'),
+      onPress: () => Alert.alert('Help & Support', 'Contact the LootNet team for support.'),
     },
     {
       icon: 'doc.text',
       title: 'Terms & Privacy',
       subtitle: 'View terms of service and privacy policy',
-      onPress: () => router.push('/profile/terms'),
+      onPress: () => Alert.alert('Terms & Privacy', 'Terms and privacy content is not available yet.'),
     },
   ];
 
@@ -109,9 +121,9 @@ export default function ProfileScreen() {
             <IconSymbol name="person.fill" size={48} color="#fff" />
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.username}>{user?.username || 'Player'}</Text>
-            <Text style={styles.email}>{user?.email || 'player@example.com'}</Text>
-            <Text style={styles.level}>Level {user?.level || 1}</Text>
+            <Text style={styles.username}>{profile?.username || user?.username || 'Player'}</Text>
+            <Text style={styles.email}>Role: {profile?.role ?? user?.role ?? 'Player'}</Text>
+            <Text style={styles.level}>Currency: {profile?.currency ?? user?.currency ?? 0}</Text>
           </View>
         </View>
       </View>
@@ -164,7 +176,7 @@ export default function ProfileScreen() {
 
       <View style={styles.footer}>
         <Text style={styles.version}>Game Companion App v1.0.0</Text>
-        <Text style={styles.copyright}>© 2024 MMORPG Companion</Text>
+        <Text style={styles.copyright}>Copyright 2026 LootNet</Text>
       </View>
     </ScrollView>
   );

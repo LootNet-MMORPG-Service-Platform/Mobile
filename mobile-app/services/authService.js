@@ -1,5 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from './api';
+import Storage from '../utils/storage';
 
 class AuthService {
   constructor() {
@@ -13,9 +13,9 @@ class AuthService {
       const response = await api.login(username, password);
       const { token, refreshToken } = response;
       
-      await AsyncStorage.setItem('authToken', token);
+      await Storage.setItem('authToken', token);
       if (refreshToken) {
-        await AsyncStorage.setItem('refreshToken', refreshToken);
+        await Storage.setItem('refreshToken', refreshToken);
       }
       
       api.setToken(token, refreshToken);
@@ -23,7 +23,7 @@ class AuthService {
       const profileResponse = await api.getUserProfile();
       this.user = profileResponse;
       this.isAuthenticated = true;
-      await AsyncStorage.setItem('userData', JSON.stringify(profileResponse));
+      await Storage.setItem('userData', JSON.stringify(profileResponse));
       
       this.startTokenRefreshMonitoring();
       
@@ -36,7 +36,7 @@ class AuthService {
 
   async register(userData) {
     try {
-      const response = await api.register(userData);
+      await api.register(userData);
       return { success: true, message: 'Registration successful' };
     } catch (error) {
       console.error('Registration error:', error);
@@ -62,7 +62,7 @@ class AuthService {
     this.tokenRefreshInterval = setInterval(async () => {
       try {
         await api.getUserProfile();
-      } catch (error) {
+      } catch (_error) {
         console.log('Token validation failed, attempting refresh');
       }
     }, 5 * 60 * 1000);
@@ -77,7 +77,7 @@ class AuthService {
 
   async logout() {
     try {
-      const refreshToken = await AsyncStorage.getItem('refreshToken');
+      const refreshToken = await Storage.getItem('refreshToken');
       
       this.stopTokenRefreshMonitoring();
       
@@ -87,7 +87,7 @@ class AuthService {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'userData']);
+      await Storage.multiRemove(['authToken', 'refreshToken', 'userData']);
       
       api.setToken(null, null);
       
@@ -98,9 +98,9 @@ class AuthService {
 
   async loadStoredAuth() {
     try {
-      const token = await AsyncStorage.getItem('authToken');
-      const refreshToken = await AsyncStorage.getItem('refreshToken');
-      const userData = await AsyncStorage.getItem('userData');
+      const token = await Storage.getItem('authToken');
+      const refreshToken = await Storage.getItem('refreshToken');
+      const userData = await Storage.getItem('userData');
       
       if (token && userData) {
         if (token.startsWith('eyJ') && token.includes('.')) {
@@ -112,7 +112,7 @@ class AuthService {
           
           return true;
         } else {
-          await AsyncStorage.multiRemove(['authToken', 'refreshToken']);
+          await Storage.multiRemove(['authToken', 'refreshToken']);
         }
       }
       return false;
@@ -122,18 +122,13 @@ class AuthService {
     }
   }
 
-  async updateUserProfile(userData) {
-    try {
-      return { success: false, error: 'Profile update not available yet' };
-    } catch (error) {
-      console.error('Profile update error:', error);
-      return { success: false, error: error.message };
-    }
+  async updateUserProfile(_userData) {
+    return { success: false, error: 'Profile update not available yet' };
   }
 
   async refreshToken() {
     try {
-      const refreshToken = await AsyncStorage.getItem('refreshToken');
+      const refreshToken = await Storage.getItem('refreshToken');
       if (!refreshToken) {
         throw new Error('No refresh token available');
       }
@@ -141,8 +136,8 @@ class AuthService {
       const response = await api.refreshToken(refreshToken);
       const { token, refreshToken: newRefreshToken } = response;
       
-      await AsyncStorage.setItem('authToken', token);
-      await AsyncStorage.setItem('refreshToken', newRefreshToken);
+      await Storage.setItem('authToken', token);
+      await Storage.setItem('refreshToken', newRefreshToken);
       
       api.setToken(token, newRefreshToken);
       

@@ -8,43 +8,50 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import authService from '../services/authService';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function ResetPasswordScreen() {
-  const [email, setEmail] = useState('');
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { resetPassword } = useAuth();
 
   const handleResetPassword = async () => {
-    if (!email) {
-      Alert.alert('Error', 'Please enter your email address');
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      Alert.alert('Error', 'Please fill in all password fields');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Error', 'New passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      Alert.alert('Error', 'New password must be at least 6 characters');
       return;
     }
 
     setIsLoading(true);
     try {
-      const result = await authService.resetPassword(email);
+      const result = await resetPassword(oldPassword, newPassword);
       if (result.success) {
-        Alert.alert(
-          'Success',
-          'Password reset instructions have been sent to your email.',
-          [{ text: 'OK', onPress: () => router.replace('/login') }]
-        );
+        Alert.alert('Success', 'Password changed', [
+          { text: 'OK', onPress: () => router.replace('/(tabs)/profile') },
+        ]);
       } else {
-        Alert.alert('Reset Failed', result.error);
+        Alert.alert('Password Change Failed', result.error || 'Unable to change password');
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const navigateToLogin = () => {
-    router.replace('/login');
   };
 
   return (
@@ -52,40 +59,65 @@ export default function ResetPasswordScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.formContainer}>
-          <Text style={styles.title}>Reset Password</Text>
-          <Text style={styles.subtitle}>
-            Enter your email address and we'll send you instructions to reset your password.
-          </Text>
+      <View style={styles.content}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <IconSymbol name="arrow.left" size={22} color="#F4E4C1" />
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
 
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          <TouchableOpacity
-            style={[styles.button, isLoading && styles.buttonDisabled]}
-            onPress={handleResetPassword}
-            disabled={isLoading}
-          >
-            <Text style={styles.buttonText}>
-              {isLoading ? 'Sending...' : 'Send Reset Instructions'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.linkButton} onPress={navigateToLogin}>
-            <Text style={styles.linkText}>Back to Sign In</Text>
-          </TouchableOpacity>
+        <View style={styles.header}>
+          <IconSymbol name="lock" size={42} color="#8B7355" />
+          <Text style={styles.title}>Change Password</Text>
+          <Text style={styles.subtitle}>Update your account password</Text>
         </View>
-      </ScrollView>
+
+        <View style={styles.inputContainer}>
+          <IconSymbol name="lock" size={20} color="#A0826D" />
+          <TextInput
+            style={styles.input}
+            placeholder="Current password"
+            placeholderTextColor="#A0826D"
+            value={oldPassword}
+            onChangeText={setOldPassword}
+            secureTextEntry
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <IconSymbol name="lock.reset" size={20} color="#A0826D" />
+          <TextInput
+            style={styles.input}
+            placeholder="New password"
+            placeholderTextColor="#A0826D"
+            value={newPassword}
+            onChangeText={setNewPassword}
+            secureTextEntry
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <IconSymbol name="checkmark" size={20} color="#A0826D" />
+          <TextInput
+            style={styles.input}
+            placeholder="Confirm new password"
+            placeholderTextColor="#A0826D"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+            onSubmitEditing={handleResetPassword}
+          />
+        </View>
+
+        <TouchableOpacity
+          style={[styles.button, isLoading && styles.buttonDisabled]}
+          onPress={handleResetPassword}
+          disabled={isLoading}
+        >
+          <Text style={styles.buttonText}>
+            {isLoading ? 'Changing...' : 'Change Password'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -93,71 +125,74 @@ export default function ResetPasswordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#2C1810',
   },
-  scrollContainer: {
-    flexGrow: 1,
+  content: {
+    flex: 1,
     justifyContent: 'center',
     padding: 20,
   },
-  formContainer: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 30,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+  backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  backText: {
+    color: '#F4E4C1',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 32,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 10,
-    color: '#333',
+    color: '#F4E4C1',
+    marginTop: 12,
+    textTransform: 'uppercase',
   },
   subtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 30,
-    color: '#666',
-    lineHeight: 22,
+    fontSize: 15,
+    color: '#A0826D',
+    marginTop: 6,
   },
   inputContainer: {
-    marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#3E2723',
+    borderRadius: 8,
+    marginBottom: 15,
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    borderColor: '#8B7355',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 15,
+    flex: 1,
+    height: 50,
+    color: '#F4E4C1',
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    marginLeft: 10,
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#8B7355',
     borderRadius: 8,
-    padding: 15,
+    height: 50,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 15,
+    marginTop: 10,
   },
   buttonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#654321',
   },
   buttonText: {
-    color: 'white',
+    color: '#F4E4C1',
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  linkButton: {
-    alignItems: 'center',
-  },
-  linkText: {
-    color: '#007AFF',
-    fontSize: 14,
+    textTransform: 'uppercase',
   },
 });

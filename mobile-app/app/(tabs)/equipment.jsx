@@ -16,7 +16,7 @@ export default function EquipmentScreen() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const categories = ['all', 'weapon', 'armor', 'helmet', 'shield', 'boots', 'accessory'];
+  const categories = ['all', 'weapon', 'armor'];
 
   useEffect(() => {
     loadEquipment();
@@ -31,7 +31,7 @@ export default function EquipmentScreen() {
       } else {
         Alert.alert('Error', result.error || 'Failed to load equipment');
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'Failed to load equipment');
     } finally {
       setIsLoading(false);
@@ -43,28 +43,32 @@ export default function EquipmentScreen() {
     : equipment.filter(item => {
         if (selectedCategory === 'weapon') {
           return item.weaponType !== undefined;
-        } else if (selectedCategory === 'armor') {
+        }
+        if (selectedCategory === 'armor') {
           return item.armorType !== undefined;
         }
         return false;
       });
 
   const getRarityColor = (item) => {
-    if (item.weaponType) {
+    if (item.weaponType !== undefined) {
       return '#8B7355';
-    } else if (item.armorType) {
+    } else if (item.armorType !== undefined) {
       return '#4169E1';
     }
     return '#666666';
   };
 
   const getRarityBorder = (item) => {
-    const color = getRarityColor(item);
-    return color.replace('#', '#654321');
+    return getRarityColor(item);
   };
 
   const getWeaponTypeDisplay = (weaponType) => {
     const types = {
+      0: 'Sword',
+      1: 'Axe',
+      2: 'Spear',
+      3: 'Mace',
       'Sword': 'Sword',
       'Axe': 'Axe', 
       'Spear': 'Spear',
@@ -75,9 +79,14 @@ export default function EquipmentScreen() {
 
   const getArmorTypeDisplay = (armorType) => {
     const types = {
-      1: 'Light Armor',
-      2: 'Medium Armor', 
-      3: 'Heavy Armor'
+      0: 'Helmet',
+      1: 'Chest',
+      2: 'Gloves',
+      3: 'Boots',
+      'Helmet': 'Helmet',
+      'Chest': 'Chest',
+      'Gloves': 'Gloves',
+      'Boots': 'Boots',
     };
     return types[armorType] || 'Unknown';
   };
@@ -90,7 +99,7 @@ export default function EquipmentScreen() {
     >
       <View style={styles.itemIcon}>
         <IconSymbol 
-          name={item.weaponType ? 'sword' : 'shield'} 
+          name={item.weaponType !== undefined ? 'sword' : 'shield'} 
           size={32} 
           color={getRarityColor(item)} 
         />
@@ -98,17 +107,17 @@ export default function EquipmentScreen() {
       <View style={styles.itemInfo}>
         <Text style={styles.itemName}>{item.name}</Text>
         <Text style={[styles.itemType, { color: getRarityColor(item) }]}>
-          {item.weaponType ? getWeaponTypeDisplay(item.weaponType) : getArmorTypeDisplay(item.armorType)}
+          {item.weaponType !== undefined ? getWeaponTypeDisplay(item.weaponType) : getArmorTypeDisplay(item.armorType)}
         </Text>
       </View>
       <View style={styles.itemStats}>
-        {item.weaponType && (
+        {item.weaponType !== undefined && (
           <>
             <Text style={styles.statText}>Cut: {item.cut || 0}</Text>
             <Text style={styles.statText}>Blunt: {item.blunt || 0}</Text>
           </>
         )}
-        {item.armorType && (
+        {item.armorType !== undefined && (
           <>
             <Text style={styles.statText}>Cut Res: {item.cutResistance || 0}</Text>
             <Text style={styles.statText}>Blunt Res: {item.bluntResistance || 0}</Text>
@@ -141,13 +150,13 @@ export default function EquipmentScreen() {
             <View style={styles.detailIconContainer}>
               <View style={[styles.detailIcon, { backgroundColor: getRarityColor(selectedItem) }]}>
                 <IconSymbol 
-                  name={selectedItem.weaponType ? 'sword' : 'shield'} 
+                  name={selectedItem.weaponType !== undefined ? 'sword' : 'shield'} 
                   size={64} 
                   color="#fff" 
                 />
               </View>
               <Text style={[styles.detailRarity, { color: getRarityColor(selectedItem) }]}>
-                {selectedItem.weaponType ? getWeaponTypeDisplay(selectedItem.weaponType) : getArmorTypeDisplay(selectedItem.armorType)}
+                {selectedItem.weaponType !== undefined ? getWeaponTypeDisplay(selectedItem.weaponType) : getArmorTypeDisplay(selectedItem.armorType)}
               </Text>
             </View>
 
@@ -156,12 +165,12 @@ export default function EquipmentScreen() {
               <Text style={styles.descriptionText}>
                 Category: {selectedItem.category}
               </Text>
-              {selectedItem.weaponType && (
+              {selectedItem.weaponType !== undefined && (
                 <Text style={styles.descriptionText}>
                   Weapon Type: {getWeaponTypeDisplay(selectedItem.weaponType)}
                 </Text>
               )}
-              {selectedItem.armorType && (
+              {selectedItem.armorType !== undefined && (
                 <Text style={styles.descriptionText}>
                   Armor Type: {getArmorTypeDisplay(selectedItem.armorType)}
                 </Text>
@@ -170,7 +179,7 @@ export default function EquipmentScreen() {
 
             <View style={styles.detailSection}>
               <Text style={styles.sectionTitle}>Statistics</Text>
-              {selectedItem.weaponType && (
+              {selectedItem.weaponType !== undefined && (
                 <>
                   <View style={styles.detailStatRow}>
                     <Text style={styles.statName}>Cut Damage</Text>
@@ -182,7 +191,7 @@ export default function EquipmentScreen() {
                   </View>
                 </>
               )}
-              {selectedItem.armorType && (
+              {selectedItem.armorType !== undefined && (
                 <>
                   <View style={styles.detailStatRow}>
                     <Text style={styles.statName}>Cut Resistance</Text>

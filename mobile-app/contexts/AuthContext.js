@@ -35,9 +35,9 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (email, password) => {
+  const login = async (username, password) => {
     try {
-      const result = await authService.login(email, password);
+      const result = await authService.login(username, password);
       if (result.success) {
         setUser(result.user);
         setIsAuthenticated(true);
@@ -69,9 +69,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const resetPassword = async (email) => {
+  const resetPassword = async (oldPassword, newPassword) => {
     try {
-      const result = await authService.resetPassword(email);
+      const result = await authService.resetPassword(oldPassword, newPassword);
       return result;
     } catch (error) {
       console.error('Password reset error:', error);

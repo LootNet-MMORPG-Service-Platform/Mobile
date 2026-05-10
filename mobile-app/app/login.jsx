@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import authService from '../services/authService';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
@@ -19,6 +19,7 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
+  const { login } = useAuth();
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
@@ -28,7 +29,7 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      const result = await authService.login(username.trim(), password);
+      const result = await login(username.trim(), password);
       
       if (result.success) {
         Alert.alert('Success', 'Welcome back!');
@@ -36,7 +37,7 @@ export default function LoginScreen() {
       } else {
         Alert.alert('Login Failed', result.error || 'An error occurred');
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
@@ -106,10 +107,6 @@ export default function LoginScreen() {
         <View style={styles.footer}>
           <TouchableOpacity onPress={() => router.push('/register')}>
             <Text style={styles.footerLink}>Create Account</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity onPress={() => router.push('/reset-password')}>
-            <Text style={styles.footerLink}>Forgot Password?</Text>
           </TouchableOpacity>
         </View>
       </View>

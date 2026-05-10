@@ -10,7 +10,14 @@ import {
   RefreshControl,
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import api from '../../services/api';
+import Storage from '../../utils/storage';
+
+const BATTLE_HISTORY_KEY = 'battleHistory';
+const BOT_CONFIG = {
+  easy: { name: 'Training Bot', health: 80, minDamage: 6, maxDamage: 12 },
+  normal: { name: 'Arena Bot', health: 100, minDamage: 10, maxDamage: 18 },
+  hard: { name: 'Champion Bot', health: 130, minDamage: 14, maxDamage: 24 },
+};
 
 export default function BattleScreen() {
   const [battleState, setBattleState] = useState('idle'); // idle, fighting, victory, defeat
@@ -31,8 +38,8 @@ export default function BattleScreen() {
 
   const loadBattleHistory = async () => {
     try {
-      const response = await api.getBattleHistory();
-      setBattleHistory(response.history || []);
+      const storedHistory = await Storage.getItem(BATTLE_HISTORY_KEY);
+      setBattleHistory(storedHistory ? JSON.parse(storedHistory) : []);
     } catch (error) {
       console.error('Error loading battle history:', error);
     }
@@ -40,14 +47,22 @@ export default function BattleScreen() {
 
   const startBattle = async (difficulty = 'normal') => {
     try {
-      const response = await api.startBattle(difficulty);
-      setCurrentBattle(response.battle);
+      const bot = BOT_CONFIG[difficulty] || BOT_CONFIG.normal;
+      const battle = {
+        bot,
+        difficulty,
+        playerHealth: 100,
+        botHealth: bot.health,
+      };
+
+      setCurrentBattle(battle);
       setBattleState('fighting');
-      setPlayerHealth(response.battle.playerHealth);
-      setBotHealth(response.battle.botHealth);
-      setBattleLog([`Battle started against ${response.battle.bot.name}!`]);
+      setPlayerHealth(battle.playerHealth);
+      setBotHealth(battle.botHealth);
+      setBattleLog([`Battle started against ${bot.name}!`]);
       setIsPlayerTurn(true);
-    } catch (error) {
+      fadeAnim.setValue(1);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to start battle');
     }
   };
@@ -79,7 +94,8 @@ export default function BattleScreen() {
   const botCounterAttack = () => {
     if (battleState !== 'fighting') return;
 
-    const botDamage = Math.floor(Math.random() * 15) + 10;
+    const bot = currentBattle?.bot || BOT_CONFIG.normal;
+    const botDamage = Math.floor(Math.random() * (bot.maxDamage - bot.minDamage + 1)) + bot.minDamage;
     const newPlayerHealth = Math.max(0, playerHealth - botDamage);
     setPlayerHealth(newPlayerHealth);
     addToBattleLog(`${currentBattle?.bot?.name || 'Bot'} deals ${botDamage} damage!`);
@@ -108,7 +124,7 @@ export default function BattleScreen() {
     setBattleLog(prev => [...prev, message]);
   };
 
-  const endBattle = (result) => {
+  const endBattle = async (result) => {
     setBattleState(result);
     if (result === 'victory') {
       addToBattleLog('Victory! You won the battle!');
@@ -118,10 +134,15 @@ export default function BattleScreen() {
       Animated.timing(fadeAnim, { toValue: 0.3, duration: 1000, useNativeDriver: true }).start();
     }
     
-    // Reload battle history
-    setTimeout(() => {
-      loadBattleHistory();
-    }, 2000);
+    const historyEntry = {
+      result,
+      opponent: currentBattle?.bot?.name || 'Bot',
+      date: new Date().toISOString(),
+    };
+
+    const nextHistory = [historyEntry, ...battleHistory].slice(0, 20);
+    setBattleHistory(nextHistory);
+    await Storage.setItem(BATTLE_HISTORY_KEY, JSON.stringify(nextHistory));
   };
 
   const resetBattle = () => {

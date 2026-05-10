@@ -1,15 +1,53 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+
+const DEFAULT_API_BASE_URL = 'http://localhost:5179/api';
+
+const getExpoHost = () => {
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    Constants.manifest2?.extra?.expoGo?.debuggerHost ||
+    Constants.manifest?.debuggerHost;
+
+  return hostUri?.split(':')?.[0];
+};
+
+const resolveApiBaseUrl = () => {
+  if (process.env.EXPO_PUBLIC_API_BASE_URL) {
+    return process.env.EXPO_PUBLIC_API_BASE_URL;
+  }
+
+  const configuredUrl = Constants.expoConfig?.extra?.apiBaseUrl;
+  const configuredUsesLocalhost =
+    configuredUrl?.includes('localhost') || configuredUrl?.includes('127.0.0.1');
+
+  if (Platform.OS !== 'web' && configuredUsesLocalhost) {
+    const expoHost = getExpoHost();
+
+    if (expoHost && expoHost !== 'localhost' && expoHost !== '127.0.0.1') {
+      return `http://${expoHost}:5179/api`;
+    }
+
+    if (Platform.OS === 'android') {
+      return 'http://10.0.2.2:5179/api';
+    }
+  }
+
+  return configuredUrl || DEFAULT_API_BASE_URL;
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 class ApiService {
   constructor() {
     this.baseURL = API_BASE_URL;
     this.token = null;
-    this.refreshToken = null;
+    this.refreshTokenValue = null;
   }
 
   setToken(token, refreshToken = null) {
     this.token = token;
-    this.refreshToken = refreshToken;
+    this.refreshTokenValue = refreshToken;
   }
 
   getHeaders() {
@@ -24,6 +62,20 @@ class ApiService {
     return headers;
   }
 
+  async parseResponse(response) {
+    const text = await response.text();
+
+    if (!text) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
+  }
+
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const config = {
@@ -33,10 +85,14 @@ class ApiService {
 
     try {
       const response = await fetch(url, config);
-      const data = await response.json();
+      const data = await this.parseResponse(response);
 
       if (!response.ok) {
-        throw new Error(data.message || 'API request failed');
+        const message =
+          typeof data === 'string'
+            ? data
+            : data?.message || data?.title || `API request failed (${response.status})`;
+        throw new Error(message);
       }
 
       return data;
@@ -44,6 +100,10 @@ class ApiService {
       console.error('API Error:', error);
       throw error;
     }
+  }
+
+  async get(endpoint) {
+    return this.request(endpoint);
   }
 
   async login(username, password) {

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import authService from '../services/authService';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function RegisterScreen() {
   const [username, setUsername] = useState('');
@@ -19,6 +19,7 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { register } = useAuth();
 
   const handleRegister = async () => {
     if (!username.trim() || !password.trim() || !confirmPassword.trim()) {
@@ -38,7 +39,7 @@ export default function RegisterScreen() {
 
     setIsLoading(true);
     try {
-      const result = await authService.register({
+      const result = await register({
         username: username.trim(),
         password: password,
       });
@@ -49,7 +50,7 @@ export default function RegisterScreen() {
       } else {
         Alert.alert('Registration Failed', result.error || 'An error occurred');
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
