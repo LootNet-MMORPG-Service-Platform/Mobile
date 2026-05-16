@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   RefreshControl,
@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useFocusEffect } from '@react-navigation/native';
 import authService from '../../services/authService';
 
 const CATEGORY_OPTIONS = [
@@ -46,6 +47,7 @@ export default function MarketScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   const selectedItem = useMemo(
     () => equipment.find((item) => item.id === selectedItemId),
@@ -54,29 +56,37 @@ export default function MarketScreen() {
 
   const loadMarket = useCallback(async () => {
     setIsLoading(true);
+    setLoadError('');
     try {
       const [listingResult, equipmentResult] = await Promise.all([
         authService.getMarketListings(category, 1, 30, sort),
-        authService.getEquipment(),
+        authService.getInventory('inventory'),
       ]);
 
       if (listingResult.success) {
         setListings(listingResult.data || []);
       } else {
-        Alert.alert('Marketplace Error', listingResult.error || 'Failed to load listings');
+        setListings([]);
+        setLoadError(listingResult.error || 'Failed to load listings');
       }
 
       if (equipmentResult.success) {
-        setEquipment(equipmentResult.data || []);
+        const nextEquipment = equipmentResult.data || [];
+        setEquipment(nextEquipment);
+        setSelectedItemId((currentId) => (
+          nextEquipment.some((item) => item.id === currentId) ? currentId : null
+        ));
+      } else {
+        setEquipment([]);
       }
     } finally {
       setIsLoading(false);
     }
   }, [category, sort]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     loadMarket();
-  }, [loadMarket]);
+  }, [loadMarket]));
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -250,6 +260,8 @@ export default function MarketScreen() {
             <Text style={styles.sectionTitle}>Listings</Text>
             {isLoading ? (
               <Text style={styles.emptyText}>Loading listings...</Text>
+            ) : loadError ? (
+              <Text style={styles.errorText}>{loadError}</Text>
             ) : listings.length > 0 ? (
               listings.map(renderListing)
             ) : (
@@ -307,12 +319,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
+    fontFamily: 'Lato_700Bold',
     color: '#F4E4C1',
     marginTop: 10,
     textTransform: 'uppercase',
   },
   subtitle: {
     fontSize: 18,
+    fontFamily: 'Lato_400Regular',
     color: '#D7C0A5',
     textAlign: 'center',
     marginTop: 6,
@@ -337,6 +351,7 @@ const styles = StyleSheet.create({
   modeButtonText: {
     color: '#D7C0A5',
     fontSize: 17,
+    fontFamily: 'Lato_700Bold',
     fontWeight: 'bold',
   },
   modeButtonTextActive: {
@@ -363,6 +378,7 @@ const styles = StyleSheet.create({
   filterText: {
     color: '#D7C0A5',
     fontSize: 14,
+    fontFamily: 'Lato_700Bold',
     fontWeight: 'bold',
   },
   filterTextActive: {
@@ -376,6 +392,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     color: '#F4E4C1',
+    fontFamily: 'Lato_700Bold',
     fontWeight: 'bold',
   },
   listing: {
@@ -402,11 +419,13 @@ const styles = StyleSheet.create({
   listingName: {
     color: '#F4E4C1',
     fontSize: 17,
+    fontFamily: 'Lato_700Bold',
     fontWeight: 'bold',
   },
   listingMeta: {
     color: '#D7C0A5',
     fontSize: 15,
+    fontFamily: 'Lato_400Regular',
     marginTop: 3,
   },
   listingAction: {
@@ -416,6 +435,7 @@ const styles = StyleSheet.create({
   price: {
     color: '#D6A84F',
     fontSize: 17,
+    fontFamily: 'Lato_700Bold',
     fontWeight: 'bold',
   },
   smallButton: {
@@ -448,6 +468,7 @@ const styles = StyleSheet.create({
   sellItemName: {
     color: '#F4E4C1',
     fontSize: 17,
+    fontFamily: 'Lato_700Bold',
     fontWeight: 'bold',
   },
   sellItemNameSelected: {
@@ -456,6 +477,7 @@ const styles = StyleSheet.create({
   sellItemMeta: {
     color: '#D7C0A5',
     fontSize: 15,
+    fontFamily: 'Lato_400Regular',
     marginTop: 3,
   },
   sellItemMetaSelected: {
@@ -476,6 +498,7 @@ const styles = StyleSheet.create({
     color: '#F4E4C1',
     height: 48,
     fontSize: 17,
+    fontFamily: 'Lato_400Regular',
     marginLeft: 10,
   },
   sellButton: {
@@ -490,6 +513,7 @@ const styles = StyleSheet.create({
   sellButtonText: {
     color: '#F4E4C1',
     fontSize: 18,
+    fontFamily: 'Lato_700Bold',
     fontWeight: 'bold',
     textTransform: 'uppercase',
   },
@@ -499,6 +523,13 @@ const styles = StyleSheet.create({
   emptyText: {
     color: '#D7C0A5',
     fontSize: 16,
+    fontFamily: 'Lato_400Regular',
     lineHeight: 22,
+  },
+  errorText: {
+    color: '#F6A96B',
+    fontSize: 15,
+    fontFamily: 'Lato_400Regular',
+    lineHeight: 21,
   },
 });

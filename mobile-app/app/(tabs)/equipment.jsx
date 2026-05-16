@@ -1,485 +1,441 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-} from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import authService from '../../services/authService';
 
+const MENU = [
+  { key: 'inventory', label: 'Inventory' },
+  { key: 'run', label: 'Adventure Gear' },
+  { key: 'market', label: 'Market Listings' },
+  { key: 'equipment', label: 'Equipment' },
+];
+
+const FILTERS = ['all', 'weapon', 'armor'];
+const SLOTS = [1, 2, 3, 4];
+const DIFFICULTIES = [
+  { key: 'easy', label: 'Scout', description: 'A lighter path with one foe' },
+  { key: 'normal', label: 'Warband', description: 'Standard challenge' },
+];
+
+const fmt = (v) => Number(v ?? 0).toFixed(1);
+const isWeapon = (i) => i?.weaponType !== undefined;
+
 export default function EquipmentScreen() {
-  const [equipment, setEquipment] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [view, setView] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [activeRun, setActiveRun] = useState(null);
+  const [inventory, setInventory] = useState([]);
+  const [runInventory, setRunInventory] = useState([]);
+  const [marketInventory, setMarketInventory] = useState([]);
+  const [equipPool, setEquipPool] = useState([]);
+  const [equipmentSlots, setEquipmentSlots] = useState({});
+  const [selectedRunLoadout, setSelectedRunLoadout] = useState([]);
+  const [runDifficulty, setRunDifficulty] = useState('easy');
+  const [detailItem, setDetailItem] = useState(null);
 
-  const categories = ['all', 'weapon', 'armor'];
+  const applyFilter = useCallback((arr) => (
+    arr.filter((x) => (
+      filter === 'all' || (filter === 'weapon' ? isWeapon(x) : !isWeapon(x))
+    ))
+  ), [filter]);
 
-  useEffect(() => {
-    loadEquipment();
+  const fetchCommon = useCallback(async () => {
+    const run = await authService.getActiveRun();
+    const runData = run.success ? run.data : null;
+    setActiveRun(runData);
+    return runData;
   }, []);
 
-  const loadEquipment = async () => {
-    setIsLoading(true);
-    try {
-      const result = await authService.getEquipment();
-      if (result.success) {
-        setEquipment(result.data || []);
-      } else {
-        Alert.alert('Error', result.error || 'Failed to load equipment');
+  const loadData = useCallback(async () => {
+    if (!view) return;
+    setLoading(true);
+    const runData = await fetchCommon();
+
+    if (view === 'inventory') {
+      const inv = await authService.getInventory('inventory');
+      setInventory(inv.success ? (inv.data || []) : []);
+      if (!inv.success) Alert.alert('Error', inv.error || 'Cannot load inventory');
+    } else if (view === 'run') {
+      const [inv, runInv] = await Promise.all([
+        authService.getInventory('inventory'),
+        authService.getInventory('run'),
+      ]);
+      const invData = inv.success ? (inv.data || []) : [];
+      setInventory(invData);
+      setRunInventory(runInv.success ? (runInv.data || []) : []);
+      if (!inv.success || !runInv.success) Alert.alert('Error', 'Cannot load adventure gear');
+
+      if (!runData) {
+        setSelectedRunLoadout((prev) => {
+          const valid = new Set(invData.map((x) => x.id));
+          return prev.filter((id) => valid.has(id));
+        });
       }
-    } catch (_error) {
-      Alert.alert('Error', 'Failed to load equipment');
-    } finally {
-      setIsLoading(false);
+    } else if (view === 'market') {
+      const market = await authService.getInventory('market');
+      setMarketInventory(market.success ? (market.data || []) : []);
+      if (!market.success) Alert.alert('Error', market.error || 'Cannot load market inventory');
+    } else if (view === 'equipment') {
+      const [slots, inv] = await Promise.all([
+        authService.getEquipmentSlots(),
+        authService.getInventory(runData ? 'run' : 'inventory'),
+      ]);
+      setEquipmentSlots(slots.success ? (slots.data || {}) : {});
+      setEquipPool(inv.success ? (inv.data || []) : []);
+      if (!slots.success || !inv.success) Alert.alert('Error', 'Cannot load equipment view');
     }
+    setLoading(false);
+  }, [view, fetchCommon]);
+
+  useFocusEffect(useCallback(() => {
+    loadData();
+  }, [loadData]));
+
+  const pushToRunLoadout = (itemId) => {
+    if (activeRun) return;
+    setSelectedRunLoadout((prev) => (prev.includes(itemId) ? prev : [...prev, itemId]));
   };
 
-  const filteredEquipment = selectedCategory === 'all' 
-    ? equipment 
-    : equipment.filter(item => {
-        if (selectedCategory === 'weapon') {
-          return item.weaponType !== undefined;
-        }
-        if (selectedCategory === 'armor') {
-          return item.armorType !== undefined;
-        }
-        return false;
-      });
+  const removeFromRunLoadout = (itemId) => {
+    if (activeRun) return;
+    setSelectedRunLoadout((prev) => prev.filter((x) => x !== itemId));
+  };
 
-  const getRarityColor = (item) => {
-    if (item.weaponType !== undefined) {
-      return '#8B7355';
-    } else if (item.armorType !== undefined) {
-      return '#4169E1';
+  const startRunWithLoadout = async () => {
+    if (activeRun) {
+      Alert.alert('Run active', 'You already have an active run.');
+      return;
     }
-    return '#666666';
+    if (!selectedRunLoadout.length) {
+      Alert.alert('Run', 'Select adventure gear first.');
+      return;
+    }
+    const result = await authService.startRun(selectedRunLoadout, runDifficulty);
+    if (!result.success) {
+      Alert.alert('Start failed', result.error || 'Cannot start run');
+      return;
+    }
+    setSelectedRunLoadout([]);
+    await loadData();
   };
 
-  const getRarityBorder = (item) => {
-    return getRarityColor(item);
+  const recall = async (itemId) => {
+    const res = await authService.returnFromMarket(itemId);
+    if (!res.success) {
+      Alert.alert('Recall failed', res.error || 'Cannot recall item');
+      return;
+    }
+    loadData();
   };
 
-  const getWeaponTypeDisplay = (weaponType) => {
-    const types = {
-      0: 'Sword',
-      1: 'Axe',
-      2: 'Spear',
-      3: 'Mace',
-      'Sword': 'Sword',
-      'Axe': 'Axe', 
-      'Spear': 'Spear',
-      'Mace': 'Mace'
-    };
-    return types[weaponType] || 'Unknown';
+  const equipArmor = async (itemId) => {
+    const res = await authService.equipItem({ id: itemId, armorType: 0 });
+    if (!res.success) {
+      Alert.alert('Equip failed', res.error || 'Cannot equip armor');
+      return;
+    }
+    loadData();
   };
 
-  const getArmorTypeDisplay = (armorType) => {
-    const types = {
-      0: 'Helmet',
-      1: 'Chest',
-      2: 'Gloves',
-      3: 'Boots',
-      'Helmet': 'Helmet',
-      'Chest': 'Chest',
-      'Gloves': 'Gloves',
-      'Boots': 'Boots',
-    };
-    return types[armorType] || 'Unknown';
+  const equipWeaponToSlot = async (itemId, slot) => {
+    const res = await authService.equipWeaponToSlot(itemId, slot);
+    if (!res.success) {
+      Alert.alert('Equip failed', res.error || 'Cannot equip weapon');
+      return;
+    }
+    loadData();
   };
 
-  const renderEquipmentItem = (item) => (
-    <TouchableOpacity
-      key={item.id}
-      style={[styles.itemContainer, { borderColor: getRarityBorder(item) }]}
-      onPress={() => setSelectedItem(item)}
-    >
-      <View style={styles.itemIcon}>
-        <IconSymbol 
-          name={item.weaponType !== undefined ? 'sword' : 'shield'} 
-          size={32} 
-          color={getRarityColor(item)} 
-        />
-      </View>
-      <View style={styles.itemInfo}>
-        <Text style={styles.itemName}>{item.name}</Text>
-        <Text style={[styles.itemType, { color: getRarityColor(item) }]}>
-          {item.weaponType !== undefined ? getWeaponTypeDisplay(item.weaponType) : getArmorTypeDisplay(item.armorType)}
-        </Text>
-      </View>
-      <View style={styles.itemStats}>
-        {item.weaponType !== undefined && (
-          <>
-            <Text style={styles.statText}>Cut: {item.cut || 0}</Text>
-            <Text style={styles.statText}>Blunt: {item.blunt || 0}</Text>
-          </>
-        )}
-        {item.armorType !== undefined && (
-          <>
-            <Text style={styles.statText}>Cut Res: {item.cutResistance || 0}</Text>
-            <Text style={styles.statText}>Blunt Res: {item.bluntResistance || 0}</Text>
-          </>
-        )}
-        {item.elements && item.elements.map((element, index) => (
-          <Text key={index} style={styles.statText}>Element: {element.type}</Text>
-        ))}
-      </View>
-    </TouchableOpacity>
+  const filteredInventory = useMemo(() => applyFilter(inventory), [inventory, applyFilter]);
+  const filteredRun = useMemo(() => applyFilter(runInventory), [runInventory, applyFilter]);
+  const filteredMarket = useMemo(() => applyFilter(marketInventory), [marketInventory, applyFilter]);
+  const filteredEquipPool = useMemo(() => applyFilter(equipPool), [equipPool, applyFilter]);
+  const equippedItemIds = useMemo(() => {
+    const ids = new Set();
+    Object.values(equipmentSlots || {}).forEach((item) => {
+      if (item?.id) ids.add(item.id);
+    });
+    return ids;
+  }, [equipmentSlots]);
+  const filteredUnequippedPool = useMemo(
+    () => filteredEquipPool.filter((i) => !equippedItemIds.has(i.id)),
+    [filteredEquipPool, equippedItemIds]
   );
 
-  const renderEquipmentDetail = () => {
-    if (!selectedItem) return null;
+  const runLoadoutItems = useMemo(() => {
+    const byId = new Map(inventory.map((x) => [x.id, x]));
+    return selectedRunLoadout.map((id) => byId.get(id)).filter(Boolean);
+  }, [selectedRunLoadout, inventory]);
 
+  const inRunLoadout = useMemo(() => new Set(selectedRunLoadout), [selectedRunLoadout]);
+
+  const renderMiniCard = (item, options = {}) => {
+    const { showStats = false, extraAction = null } = options;
     return (
-      <View style={styles.detailOverlay}>
-        <View style={styles.detailContainer}>
-          <View style={styles.detailHeader}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setSelectedItem(null)}
-            >
-              <IconSymbol name="xmark" size={24} color="#8B7355" />
-            </TouchableOpacity>
-            <Text style={styles.detailTitle}>{selectedItem.name}</Text>
-          </View>
-
-          <ScrollView style={styles.detailContent}>
-            <View style={styles.detailIconContainer}>
-              <View style={[styles.detailIcon, { backgroundColor: getRarityColor(selectedItem) }]}>
-                <IconSymbol 
-                  name={selectedItem.weaponType !== undefined ? 'sword' : 'shield'} 
-                  size={64} 
-                  color="#fff" 
-                />
-              </View>
-              <Text style={[styles.detailRarity, { color: getRarityColor(selectedItem) }]}>
-                {selectedItem.weaponType !== undefined ? getWeaponTypeDisplay(selectedItem.weaponType) : getArmorTypeDisplay(selectedItem.armorType)}
-              </Text>
-            </View>
-
-            <View style={styles.detailSection}>
-              <Text style={styles.sectionTitle}>Properties</Text>
-              <Text style={styles.descriptionText}>
-                Category: {selectedItem.category}
-              </Text>
-              {selectedItem.weaponType !== undefined && (
-                <Text style={styles.descriptionText}>
-                  Weapon Type: {getWeaponTypeDisplay(selectedItem.weaponType)}
-                </Text>
-              )}
-              {selectedItem.armorType !== undefined && (
-                <Text style={styles.descriptionText}>
-                  Armor Type: {getArmorTypeDisplay(selectedItem.armorType)}
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.detailSection}>
-              <Text style={styles.sectionTitle}>Statistics</Text>
-              {selectedItem.weaponType !== undefined && (
-                <>
-                  <View style={styles.detailStatRow}>
-                    <Text style={styles.statName}>Cut Damage</Text>
-                    <Text style={styles.statValue}>{selectedItem.cut || 0}</Text>
-                  </View>
-                  <View style={styles.detailStatRow}>
-                    <Text style={styles.statName}>Blunt Damage</Text>
-                    <Text style={styles.statValue}>{selectedItem.blunt || 0}</Text>
-                  </View>
-                </>
-              )}
-              {selectedItem.armorType !== undefined && (
-                <>
-                  <View style={styles.detailStatRow}>
-                    <Text style={styles.statName}>Cut Resistance</Text>
-                    <Text style={styles.statValue}>{selectedItem.cutResistance || 0}</Text>
-                  </View>
-                  <View style={styles.detailStatRow}>
-                    <Text style={styles.statName}>Blunt Resistance</Text>
-                    <Text style={styles.statValue}>{selectedItem.bluntResistance || 0}</Text>
-                  </View>
-                </>
-              )}
-              {selectedItem.elements && selectedItem.elements.map((element, index) => (
-                <View key={index} style={styles.detailStatRow}>
-                  <Text style={styles.statName}>Element</Text>
-                  <Text style={styles.statValue}>{element.type}</Text>
-                </View>
-              ))}
-            </View>
-          </ScrollView>
-        </View>
-      </View>
+      <TouchableOpacity key={item.id} style={styles.miniCard} onPress={() => setDetailItem(item)}>
+        <IconSymbol name={isWeapon(item) ? 'sword' : 'shield'} size={22} color="#F4E4C1" />
+        {showStats && (
+          <Text style={styles.miniStats}>
+            {isWeapon(item) ? `C ${fmt(item.cut)} / B ${fmt(item.blunt)}` : `CR ${fmt(item.cutResistance)} / BR ${fmt(item.bluntResistance)}`}
+          </Text>
+        )}
+        {extraAction}
+      </TouchableOpacity>
     );
   };
 
+  const showFilters = !!view;
+
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Equipment Inventory</Text>
-        <Text style={styles.headerSubtitle}>Browse your war gear</Text>
-      </View>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}><Text style={styles.title}>Inventory</Text></View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-        {categories.map((category) => (
-          <TouchableOpacity
-            key={category}
-            style={[
-              styles.categoryButton,
-              selectedCategory === category && styles.categoryButtonActive,
-            ]}
-            onPress={() => setSelectedCategory(category)}
-          >
-            <Text style={[
-              styles.categoryButtonText,
-              selectedCategory === category && styles.categoryButtonTextActive,
-            ]}>
-              {category.charAt(0).toUpperCase() + category.slice(1)}
-            </Text>
+      {!view && (
+        <View style={styles.menuWrap}>
+          {MENU.map((m) => (
+            <TouchableOpacity key={m.key} style={styles.menuBtn} onPress={() => setView(m.key)}>
+              <Text style={styles.menuTxt}>{m.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {view && (
+        <>
+          <TouchableOpacity style={styles.back} onPress={() => setView(null)}>
+            <IconSymbol name="chevron.left" size={16} color="#F4E4C1" />
+            <Text style={styles.backTxt}>Back to Menu</Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
 
-      <ScrollView style={styles.equipmentList}>
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading equipment...</Text>
+          {showFilters && (
+            <View style={styles.filterContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterRowContent}>
+                {FILTERS.map((f) => (
+                  <TouchableOpacity key={f} style={[styles.filterBtn, filter === f && styles.filterBtnActive]} onPress={() => setFilter(f)}>
+                    <Text style={[styles.filterTxt, filter === f && styles.filterTxtActive]}>{f.toUpperCase()}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {loading && <Text style={styles.helper}>Loading...</Text>}
+
+          {view === 'inventory' && (
+            <>
+              {activeRun ? (
+                <Text style={styles.lockInfo}>Run is active. Selection is locked.</Text>
+              ) : (
+                <Text style={styles.lockInfo}>Inventory view.</Text>
+              )}
+              <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+                {filteredInventory.map((i) => renderMiniCard(i, {
+                  showStats: true,
+                }))}
+              </ScrollView>
+            </>
+          )}
+
+          {view === 'run' && (
+            <>
+              {activeRun ? (
+                <Text style={styles.lockInfo}>Run is active. Run inventory editing is blocked.</Text>
+              ) : (
+                <TouchableOpacity style={styles.startBtn} onPress={startRunWithLoadout}>
+                  <Text style={styles.startTxt}>Start Run ({selectedRunLoadout.length} selected)</Text>
+                </TouchableOpacity>
+              )}
+
+              {!activeRun && (
+                <>
+                  <Text style={styles.sectionLabel}>Difficulty</Text>
+                  <View style={styles.difficultyRow}>
+                    {DIFFICULTIES.map((difficulty) => (
+                      <TouchableOpacity
+                        key={difficulty.key}
+                        style={[styles.difficultyBtn, runDifficulty === difficulty.key && styles.difficultyBtnActive]}
+                        onPress={() => setRunDifficulty(difficulty.key)}
+                      >
+                        <Text style={[styles.difficultyTitle, runDifficulty === difficulty.key && styles.difficultyTitleActive]}>
+                          {difficulty.label}
+                        </Text>
+                        <Text style={[styles.difficultyDesc, runDifficulty === difficulty.key && styles.difficultyDescActive]}>
+                          {difficulty.description}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text style={styles.sectionLabel}>Selected Adventure Gear</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalList} contentContainerStyle={styles.horizontalListContent}>
+                    {runLoadoutItems.map((i) => renderMiniCard(i, {
+                      showStats: true,
+                      extraAction: (
+                        <TouchableOpacity style={styles.actionBtn} onPress={() => removeFromRunLoadout(i.id)}>
+                          <Text style={styles.actionTxt}>Remove</Text>
+                        </TouchableOpacity>
+                      ),
+                    }))}
+                    {runLoadoutItems.length === 0 && <Text style={styles.helper}>No selected items.</Text>}
+                  </ScrollView>
+
+                  <Text style={styles.sectionLabel}>Choose Gear</Text>
+                  <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+                    {filteredInventory.map((i) => renderMiniCard(i, {
+                      showStats: true,
+                      extraAction: (
+                        <TouchableOpacity
+                          style={[styles.actionBtn, inRunLoadout.has(i.id) && styles.actionBtnActive]}
+                          onPress={() => pushToRunLoadout(i.id)}
+                        >
+                          <Text style={styles.actionTxt}>{inRunLoadout.has(i.id) ? 'Added' : 'Take Along'}</Text>
+                        </TouchableOpacity>
+                      ),
+                    }))}
+                  </ScrollView>
+                </>
+              )}
+
+              {activeRun && (
+                <>
+                  <Text style={styles.sectionLabel}>Adventure Gear</Text>
+                  <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+                    {filteredRun.map((i) => renderMiniCard(i, { showStats: true }))}
+                  </ScrollView>
+                </>
+              )}
+            </>
+          )}
+
+          {view === 'market' && (
+            <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+              {filteredMarket.map((i) => renderMiniCard(i, {
+                showStats: true,
+                extraAction: (
+                  <TouchableOpacity style={styles.actionBtn} onPress={() => recall(i.id)}>
+                    <Text style={styles.actionTxt}>Recall</Text>
+                  </TouchableOpacity>
+                ),
+              }))}
+            </ScrollView>
+          )}
+
+          {view === 'equipment' && (
+            <>
+              <View style={styles.slotGrid}>
+                {SLOTS.map((s) => (
+                  <TouchableOpacity
+                    key={`w${s}`}
+                    style={styles.slotCard}
+                    onPress={() => {
+                      const item = equipmentSlots[`weapon${s}`] || equipmentSlots[`Weapon${s}`];
+                      if (item) setDetailItem(item);
+                    }}
+                  >
+                    <Text style={styles.slotLabel}>Weapon {s}</Text>
+                    <Text style={styles.slotValue}>{equipmentSlots[`weapon${s}`]?.name || equipmentSlots[`Weapon${s}`]?.name || 'Empty'}</Text>
+                  </TouchableOpacity>
+                ))}
+                {['head', 'body', 'gloves', 'legs', 'boots'].map((k) => (
+                  <TouchableOpacity
+                    key={k}
+                    style={styles.slotCard}
+                    onPress={() => {
+                      const key = k.charAt(0).toUpperCase() + k.slice(1);
+                      const item = equipmentSlots[k] || equipmentSlots[key];
+                      if (item) setDetailItem(item);
+                    }}
+                  >
+                    <Text style={styles.slotLabel}>{k.toUpperCase()}</Text>
+                    <Text style={styles.slotValue}>{equipmentSlots[k]?.name || equipmentSlots[k.charAt(0).toUpperCase() + k.slice(1)]?.name || 'Empty'}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+                {filteredUnequippedPool.map((i) => renderMiniCard(i, {
+                  showStats: true,
+                  extraAction: isWeapon(i) ? (
+                    <View style={styles.slotBtnsRow}>
+                      {SLOTS.map((s) => (
+                        <TouchableOpacity key={s} style={styles.actionBtn} onPress={() => equipWeaponToSlot(i.id, s)}>
+                          <Text style={styles.actionTxt}>S{s}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  ) : (
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => equipArmor(i.id)}>
+                      <Text style={styles.actionTxt}>Equip</Text>
+                    </TouchableOpacity>
+                  ),
+                }))}
+              </ScrollView>
+            </>
+          )}
+        </>
+      )}
+
+      {detailItem && (
+        <TouchableOpacity style={styles.modalBg} onPress={() => setDetailItem(null)}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{detailItem.name}</Text>
+            <Text style={styles.modalLine}>{isWeapon(detailItem) ? `Cut ${fmt(detailItem.cut)} / Blunt ${fmt(detailItem.blunt)}` : `Cut Res ${fmt(detailItem.cutResistance)} / Blunt Res ${fmt(detailItem.bluntResistance)}`}</Text>
+            {!!detailItem.elements?.length && (
+              <Text style={styles.modalLine}>Elements: {detailItem.elements.map((e) => e.type).join(', ')}</Text>
+            )}
           </View>
-        ) : (
-          filteredEquipment.map(renderEquipmentItem)
-        )}
-      </ScrollView>
-
-      {renderEquipmentDetail()}
-    </View>
+        </TouchableOpacity>
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#2C1810',
-  },
-  header: {
-    backgroundColor: '#1A0E08',
-    padding: 20,
-    borderBottomWidth: 2,
-    borderBottomColor: '#8B7355',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#F4E4C1',
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  headerSubtitle: {
-    fontSize: 17,
-    color: '#D7C0A5',
-    textAlign: 'center',
-    marginTop: 5,
-    fontStyle: 'italic',
-  },
-  categoryScroll: {
-    backgroundColor: '#1A0E08',
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#8B7355',
-  },
-  categoryButton: {
-    backgroundColor: '#3E2723',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 4,
-    marginHorizontal: 5,
-    borderWidth: 1,
-    borderColor: '#8B7355',
-  },
-  categoryButtonActive: {
-    backgroundColor: '#8B7355',
-    borderColor: '#F4E4C1',
-  },
-  categoryButtonText: {
-    color: '#D7C0A5',
-    fontSize: 15,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-  },
-  categoryButtonTextActive: {
-    color: '#F4E4C1',
-  },
-  equipmentList: {
-    flex: 1,
-    padding: 10,
-  },
-  itemContainer: {
-    backgroundColor: '#3E2723',
-    borderWidth: 2,
-    borderRadius: 8,
-    padding: 15,
-    marginVertical: 8,
-    marginHorizontal: 5,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  itemIcon: {
-    width: 60,
-    height: 60,
-    backgroundColor: '#2C1810',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#8B7355',
-    marginRight: 15,
-  },
-  itemInfo: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#F4E4C1',
-    marginBottom: 4,
-  },
-  itemType: {
-    fontSize: 15,
-    color: '#D7C0A5',
-    fontStyle: 'italic',
-  },
-  itemStats: {
-    alignItems: 'flex-start',
-  },
-  statText: {
-    fontSize: 14,
-    color: '#F4E4C1',
-    marginBottom: 2,
-  },
-  detailOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(26, 14, 8, 0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  detailContainer: {
-    backgroundColor: '#2C1810',
-    margin: 20,
-    borderRadius: 12,
-    borderWidth: 3,
-    borderColor: '#8B7355',
-    maxHeight: '80%',
-    width: '90%',
-  },
-  detailHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 15,
-    borderBottomWidth: 2,
-    borderBottomColor: '#8B7355',
-    backgroundColor: '#1A0E08',
-  },
-  closeButton: {
-    padding: 5,
-  },
-  detailTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#F4E4C1',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  detailContent: {
-    padding: 20,
-  },
-  detailIconContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  detailIcon: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#000',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  detailRarity: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  detailSection: {
-    marginBottom: 20,
-    backgroundColor: '#1A0E08',
-    padding: 15,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#8B7355',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#F4E4C1',
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    borderBottomWidth: 1,
-    borderBottomColor: '#8B7355',
-    paddingBottom: 5,
-  },
-  descriptionText: {
-    fontSize: 16,
-    color: '#D7C0A5',
-    lineHeight: 20,
-    fontStyle: 'italic',
-  },
-  detailStatRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: '#3E2723',
-  },
-  statName: {
-    fontSize: 16,
-    color: '#F4E4C1',
-    fontWeight: 'bold',
-  },
-  statValue: {
-    fontSize: 16,
-    color: '#4CAF50',
-    fontWeight: 'bold',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 18,
-    color: '#F4E4C1',
-  },
+  container: { flex: 1, backgroundColor: '#2C1810' },
+  header: { backgroundColor: '#1A0E08', paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: '#8B7355' },
+  title: { color: '#F4E4C1', textAlign: 'center', fontSize: 20, fontWeight: '700', fontFamily: 'Lato_700Bold' },
+  menuWrap: { padding: 10 },
+  menuBtn: { height: 46, marginBottom: 8, backgroundColor: '#3E2723', borderColor: '#8B7355', borderWidth: 1, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  menuTxt: { color: '#F4E4C1', fontWeight: '700', fontFamily: 'Lato_700Bold' },
+  back: { marginTop: 6, marginHorizontal: 10, paddingVertical: 8, flexDirection: 'row', alignItems: 'center' },
+  backTxt: { color: '#F4E4C1', marginLeft: 4, fontFamily: 'Lato_400Regular' },
+  filterContainer: { height: 50, justifyContent: 'center' },
+  filterRow: { paddingHorizontal: 10 },
+  filterRowContent: { alignItems: 'center' },
+  filterBtn: { height: 34, minWidth: 84, marginRight: 8, borderRadius: 6, borderWidth: 1, borderColor: '#8B7355', justifyContent: 'center', alignItems: 'center', backgroundColor: '#3E2723' },
+  filterBtnActive: { backgroundColor: '#8B7355' },
+  filterTxt: { color: '#A0826D', fontSize: 11, fontWeight: '700' },
+  filterTxtActive: { color: '#F4E4C1' },
+  startBtn: { marginHorizontal: 10, marginBottom: 8, backgroundColor: '#8B7355', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
+  startTxt: { color: '#F4E4C1', fontWeight: '700', fontSize: 12, fontFamily: 'Lato_700Bold' },
+  lockInfo: { color: '#A0826D', marginHorizontal: 10, marginBottom: 8, fontFamily: 'Lato_400Regular' },
+  helper: { color: '#A0826D', marginHorizontal: 10, marginBottom: 8, fontFamily: 'Lato_400Regular' },
+  sectionLabel: { color: '#D6A84F', marginHorizontal: 10, marginBottom: 6, fontSize: 12, fontWeight: '700', fontFamily: 'Lato_700Bold' },
+  difficultyRow: { flexDirection: 'row', gap: 8, marginHorizontal: 10, marginBottom: 10 },
+  difficultyBtn: { flex: 1, backgroundColor: '#3E2723', borderWidth: 1, borderColor: '#8B7355', borderRadius: 8, padding: 10 },
+  difficultyBtnActive: { backgroundColor: '#D6A84F', borderColor: '#F4E4C1' },
+  difficultyTitle: { color: '#F4E4C1', fontSize: 13, fontWeight: '700', fontFamily: 'Lato_700Bold' },
+  difficultyTitleActive: { color: '#2C1810' },
+  difficultyDesc: { color: '#A0826D', fontSize: 11, marginTop: 4, fontFamily: 'Lato_400Regular' },
+  difficultyDescActive: { color: '#3E2723' },
+  list: { flex: 1, paddingHorizontal: 10 },
+  listContent: { paddingBottom: 16 },
+  horizontalList: { maxHeight: 126, marginBottom: 8 },
+  horizontalListContent: { paddingHorizontal: 10, alignItems: 'center' },
+  miniCard: { width: 148, minHeight: 84, backgroundColor: '#3E2723', borderWidth: 1, borderColor: '#8B7355', borderRadius: 8, padding: 8, marginRight: 8, marginBottom: 8, justifyContent: 'center', alignItems: 'center' },
+  miniStats: { color: '#A0826D', marginTop: 6, fontSize: 11, textAlign: 'center', fontFamily: 'Lato_400Regular' },
+  actionBtn: { marginTop: 6, backgroundColor: '#8B7355', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5 },
+  actionBtnActive: { backgroundColor: '#4F9D69' },
+  actionTxt: { color: '#F4E4C1', fontSize: 11, fontWeight: '700', fontFamily: 'Lato_700Bold' },
+  slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 10, marginBottom: 6 },
+  slotCard: { minWidth: 92, backgroundColor: '#3E2723', borderColor: '#8B7355', borderWidth: 1, borderRadius: 8, padding: 6 },
+  slotLabel: { color: '#D6A84F', fontSize: 10, fontFamily: 'Lato_700Bold' },
+  slotValue: { color: '#F4E4C1', fontSize: 11, marginTop: 3, fontFamily: 'Lato_400Regular' },
+  slotBtnsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 6 },
+  modalBg: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 20 },
+  modalCard: { backgroundColor: '#2C1810', borderWidth: 1, borderColor: '#8B7355', borderRadius: 10, padding: 14 },
+  modalTitle: { color: '#F4E4C1', fontSize: 18, fontWeight: '700', fontFamily: 'Lato_700Bold' },
+  modalLine: { color: '#A0826D', marginTop: 8, fontFamily: 'Lato_400Regular' },
 });

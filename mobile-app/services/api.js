@@ -1,7 +1,13 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-const DEFAULT_API_BASE_URL = 'http://localhost:5179/api';
+const DEFAULT_API_BASE_URL = 'https://lootnet-api.onrender.com/api';
+
+const normalizeApiBaseUrl = (rawUrl) => {
+  if (!rawUrl) return rawUrl;
+  const trimmed = rawUrl.trim().replace(/\/+$/, '');
+  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+};
 
 const getExpoHost = () => {
   const hostUri =
@@ -14,26 +20,26 @@ const getExpoHost = () => {
 
 const resolveApiBaseUrl = () => {
   if (process.env.EXPO_PUBLIC_API_BASE_URL) {
-    return process.env.EXPO_PUBLIC_API_BASE_URL;
+    return normalizeApiBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL);
   }
 
   const configuredUrl = Constants.expoConfig?.extra?.apiBaseUrl;
   const configuredUsesLocalhost =
     configuredUrl?.includes('localhost') || configuredUrl?.includes('127.0.0.1');
 
-  if (Platform.OS !== 'web' && (!configuredUrl || configuredUsesLocalhost)) {
+  if (Platform.OS !== 'web' && configuredUsesLocalhost) {
     const expoHost = getExpoHost();
 
     if (expoHost && expoHost !== 'localhost' && expoHost !== '127.0.0.1') {
-      return `http://${expoHost}:5179/api`;
+      return normalizeApiBaseUrl(`http://${expoHost}:5179/api`);
     }
 
     if (Platform.OS === 'android') {
-      return 'http://10.0.2.2:5179/api';
+      return normalizeApiBaseUrl('http://10.0.2.2:5179/api');
     }
   }
 
-  return configuredUrl || DEFAULT_API_BASE_URL;
+  return normalizeApiBaseUrl(configuredUrl || DEFAULT_API_BASE_URL);
 };
 
 const API_BASE_URL = resolveApiBaseUrl();
@@ -64,11 +70,21 @@ class ApiService {
     const headers = {
       'Content-Type': 'application/json',
     };
-    
+
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`;
     }
-    
+
+    return headers;
+  }
+
+  getMultipartHeaders() {
+    const headers = {};
+
+    if (this.token) {
+      headers.Authorization = `Bearer ${this.token}`;
+    }
+
     return headers;
   }
 
@@ -146,7 +162,43 @@ class ApiService {
           await this.onAuthExpired();
         }
 
-        throw new Error(message);
+        throw new Error(`${message} [${url}]`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('API Error:', error);
+      throw error;
+    }
+  }
+
+  async requestForm(endpoint, formData, options = {}) {
+    const url = `${this.baseURL}${endpoint}`;
+    const config = {
+      method: 'POST',
+      headers: this.getMultipartHeaders(),
+      body: formData,
+      ...options,
+    };
+
+    try {
+      const response = await fetch(url, config);
+      const data = await this.parseResponse(response);
+
+      if (response.status === 401 && this.refreshTokenValue) {
+        const refreshResult = await this.refreshAccessToken();
+
+        if (refreshResult?.token) {
+          return this.requestForm(endpoint, formData, { ...options, headers: this.getMultipartHeaders() });
+        }
+      }
+
+      if (!response.ok) {
+        const message =
+          typeof data === 'string'
+            ? data
+            : data?.message || data?.title || `API request failed (${response.status})`;
+        throw new Error(`${message} [${url}]`);
       }
 
       return data;
@@ -196,7 +248,7 @@ class ApiService {
   }
 
   async getUserProfile() {
-    return this.request('/auth/me');
+    return this.request('/mobile/me');
   }
 
   async getMobileProfile() {
@@ -207,8 +259,91 @@ class ApiService {
     return this.request('/mobile/items');
   }
 
+  async getInventory(scope = 'inventory') {
+    const endpoints = {
+      inventory: '/mobile/inventory',
+      run: '/mobile/inventory/run',
+      market: '/mobile/inventory/market',
+    };
+    return this.request(endpoints[scope] || endpoints.inventory);
+  }
+
+  async getEquippedItems() {
+    return this.request('/mobile/equipment');
+  }
+
+  async equipWeapon(slot, itemId) {
+    return this.request(`/mobile/equip/weapon/${slot}/${itemId}`, {
+      method: 'POST',
+    });
+  }
+
+  async equipArmor(itemId) {
+    return this.request(`/mobile/equip/armor/${itemId}`, {
+      method: 'POST',
+    });
+  }
+
+  async unequip(itemId) {
+    return this.request(`/mobile/unequip/${itemId}`, {
+      method: 'POST',
+    });
+  }
+
+  async returnFromMarket(itemId) {
+    return this.request('/mobile/inventory/market/return', {
+      method: 'POST',
+      body: JSON.stringify({ itemId }),
+    });
+  }
+
+  async uploadProfilePicture(uri, fileName = 'profile.jpg', mimeType = 'image/jpeg') {
+    const formData = new FormData();
+    formData.append('file', {
+      uri,
+      name: fileName,
+      type: mimeType,
+    });
+
+    return this.requestForm('/mobile/me/pfp', formData);
+  }
+
   async claimDailyReward() {
     return this.request('/mobile/daily', {
+      method: 'POST',
+    });
+  }
+
+  async startRun(payload = {}) {
+    return this.request('/run/start', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getActiveRun() {
+    return this.request('/run/active');
+  }
+
+  async getCurrentBattle() {
+    return this.request('/run/battle/current');
+  }
+
+  async goFurther() {
+    return this.request('/run/go-further', {
+      method: 'POST',
+    });
+  }
+
+  async finishTurn(payload) {
+    return this.request('/run/turn', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async endRun() {
+    return this.request('/run/end', {
       method: 'POST',
     });
   }
@@ -217,10 +352,10 @@ class ApiService {
     const params = new URLSearchParams({
       pageNumber: pageNumber.toString(),
       pageSize: pageSize.toString(),
-      sort: sort,
-      ...(category && { category: category }),
+      sort,
+      ...(category && { category }),
     });
-    
+
     return this.request(`/market/listing?${params}`);
   }
 

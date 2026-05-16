@@ -1,16 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-} from 'react-native';
+import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '../../contexts/AuthContext';
 import authService from '../../services/authService';
+
+const roleMap = {
+  0: 'Super Admin',
+  1: 'Admin',
+  2: 'Game Moderator',
+  3: 'Player',
+};
+
+const resolveProfileImage = (path) => {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  return `https://lootnet-api.onrender.com${path}`;
+};
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -19,323 +25,131 @@ export default function ProfileScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const loadProfile = async () => {
+    (async () => {
       const result = await authService.getMobileProfile();
-      if (result.success) {
-        setProfile(result.data);
-      }
-    };
-
-    loadProfile();
+      if (result.success) setProfile(result.data);
+    })();
   }, []);
 
+  const roleValue = profile?.role ?? user?.role;
+  const roleLabel = roleMap[roleValue] || roleValue || 'Player';
+  const isPlayer = roleValue === 3 || roleLabel === 'Player';
+  const profileImageUri = resolveProfileImage(profile?.profileImagePath);
+
   const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            setIsLoading(true);
-            try {
-              await logout();
-              router.replace('/login');
-            } catch (_error) {
-              Alert.alert('Error', 'Failed to logout');
-            } finally {
-              setIsLoading(false);
-            }
-          },
-        },
-      ]
-    );
+    setIsLoading(true);
+    await logout();
+    setIsLoading(false);
+    router.replace('/login');
   };
 
-  const menuItems = [
-    {
-      icon: 'person.fill',
-      title: 'Account Settings',
-      subtitle: 'Update your profile information',
-      onPress: () => Alert.alert('Coming Soon', 'Profile editing is not available in the API yet.'),
-    },
-    {
-      icon: 'shield',
-      title: 'Security',
-      subtitle: 'Manage password and security settings',
-      onPress: () => router.push('/reset-password'),
-    },
-    {
-      icon: 'bell',
-      title: 'Notifications',
-      subtitle: 'Configure app notifications',
-      onPress: () => Alert.alert('Coming Soon', 'Notification settings are not available yet.'),
-    },
-    {
-      icon: 'questionmark.circle',
-      title: 'Help & Support',
-      subtitle: 'Get help with the app',
-      onPress: () => Alert.alert('Help & Support', 'Contact the LootNet team for support.'),
-    },
-    {
-      icon: 'doc.text',
-      title: 'Terms & Privacy',
-      subtitle: 'View terms of service and privacy policy',
-      onPress: () => Alert.alert('Terms & Privacy', 'Terms and privacy content is not available yet.'),
-    },
-  ];
+  const handleChangeProfilePicture = async () => {
+    try {
+      let ImagePicker;
+      try {
+        ImagePicker = await import('expo-image-picker');
+      } catch {
+        Alert.alert('Unavailable', 'Profile pictures are not available right now.');
+        return;
+      }
 
-  const statsItems = [
-    {
-      icon: 'gamecontroller',
-      label: 'Battles',
-      value: '42',
-    },
-    {
-      icon: 'trophy',
-      label: 'Victories',
-      value: '28',
-    },
-    {
-      icon: 'flame',
-      label: 'Streak',
-      value: '7',
-    },
-    {
-      icon: 'calendar',
-      label: 'Days Active',
-      value: '15',
-    },
-  ];
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission denied', 'Gallery permission is required.');
+        return;
+      }
+
+      const pick = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.85,
+      });
+
+      if (pick.canceled || !pick.assets?.length) {
+        return;
+      }
+
+      const asset = pick.assets[0];
+      const lowerUri = (asset.uri || '').toLowerCase();
+      const resolvedMime = asset.mimeType
+        || (lowerUri.endsWith('.png') ? 'image/png'
+          : lowerUri.endsWith('.webp') ? 'image/webp'
+            : 'image/jpeg');
+      const resolvedFileName = asset.fileName
+        || `profile.${resolvedMime === 'image/png' ? 'png' : resolvedMime === 'image/webp' ? 'webp' : 'jpg'}`;
+      const upload = await authService.uploadProfilePicture(
+        asset.uri,
+        resolvedFileName,
+        resolvedMime
+      );
+
+      if (!upload.success) {
+        Alert.alert('Upload failed', upload.error || 'Unable to upload profile picture.');
+        return;
+      }
+
+      const refreshed = await authService.getMobileProfile();
+      if (refreshed.success) {
+        setProfile(refreshed.data);
+      }
+    } catch (error) {
+      Alert.alert('Error', error?.message || 'Unexpected upload error');
+    }
+  };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.profileHeader}>
-          <View style={styles.avatarContainer}>
-            <IconSymbol name="person.fill" size={48} color="#fff" />
-          </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.username}>{profile?.username || user?.username || 'Player'}</Text>
-            <Text style={styles.email}>Role: {profile?.role ?? user?.role ?? 'Player'}</Text>
-            <Text style={styles.level}>Currency: {profile?.currency ?? user?.currency ?? 0}</Text>
-          </View>
+        <View style={styles.avatar}>
+          {profileImageUri ? (
+            <Image source={{ uri: profileImageUri }} style={styles.avatarImage} />
+          ) : (
+            <IconSymbol name="person.fill" size={42} color="#F4E4C1" />
+          )}
         </View>
+        <Text style={styles.username}>{profile?.username || user?.username || 'Player'}</Text>
+        {!isPlayer && <Text style={styles.role}>{roleLabel}</Text>}
+        <Text style={styles.currency}>Currency: {profile?.currency ?? 0}</Text>
       </View>
 
-      <View style={styles.statsContainer}>
-        <Text style={styles.sectionTitle}>Game Statistics</Text>
-        <View style={styles.statsGrid}>
-          {statsItems.map((stat, index) => (
-            <View key={index} style={styles.statItem}>
-              <IconSymbol name={stat.icon} size={24} color="#007AFF" />
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.menuContainer}>
-        <Text style={styles.sectionTitle}>Settings</Text>
-        {menuItems.map((item, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.menuItem}
-            onPress={item.onPress}
-          >
-            <View style={styles.menuLeft}>
-              <IconSymbol name={item.icon} size={24} color="#666" />
-              <View style={styles.menuText}>
-                <Text style={styles.menuTitle}>{item.title}</Text>
-                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
-              </View>
-            </View>
-            <IconSymbol name="chevron.right" size={16} color="#ccc" />
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.logoutContainer}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Account</Text>
+        <TouchableOpacity style={styles.row} onPress={() => router.push('/reset-password')}>
+          <IconSymbol name="lock" size={18} color="#D6A84F" />
+          <Text style={styles.rowText}>Reset Password</Text>
+        </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.logoutButton, isLoading && styles.logoutButtonDisabled]}
-          onPress={handleLogout}
-          disabled={isLoading}
+          style={styles.row}
+          onPress={handleChangeProfilePicture}
         >
-          <IconSymbol name="arrow.right.square" size={20} color="#fff" />
-          <Text style={styles.logoutButtonText}>
-            {isLoading ? 'Logging Out...' : 'Logout'}
-          </Text>
+          <IconSymbol name="camera" size={18} color="#D6A84F" />
+          <Text style={styles.rowText}>Change Profile Picture</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.footer}>
-        <Text style={styles.version}>Game Companion App v1.0.0</Text>
-        <Text style={styles.copyright}>Copyright 2026 LootNet</Text>
+      <View style={styles.logoutWrap}>
+        <TouchableOpacity style={[styles.logoutBtn, isLoading && styles.logoutDisabled]} disabled={isLoading} onPress={handleLogout}>
+          <Text style={styles.logoutText}>{isLoading ? 'Logging out...' : 'Logout'}</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ECE7DF',
-  },
-  header: {
-    backgroundColor: '#007AFF',
-    paddingTop: 20,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
-  },
-  profileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileInfo: {
-    marginLeft: 20,
-    flex: 1,
-  },
-  username: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 5,
-  },
-  email: {
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 5,
-  },
-  level: {
-    fontSize: 17,
-    color: 'rgba(255,255,255,0.7)',
-    fontWeight: 'bold',
-  },
-  statsContainer: {
-    backgroundColor: '#FFFFFF',
-    margin: 20,
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1F130D',
-    marginBottom: 15,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1F130D',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 15,
-    color: '#3E2E25',
-  },
-  menuContainer: {
-    backgroundColor: '#FFFFFF',
-    margin: 20,
-    marginTop: 0,
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  menuLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  menuText: {
-    marginLeft: 15,
-    flex: 1,
-  },
-  menuTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1F130D',
-  },
-  menuSubtitle: {
-    fontSize: 16,
-    color: '#3E2E25',
-    marginTop: 2,
-  },
-  logoutContainer: {
-    margin: 20,
-    marginTop: 0,
-  },
-  logoutButton: {
-    backgroundColor: '#F44336',
-    borderRadius: 12,
-    padding: 18,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  logoutButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  logoutButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  footer: {
-    alignItems: 'center',
-    paddingVertical: 30,
-  },
-  version: {
-    fontSize: 16,
-    color: '#3E2E25',
-    marginBottom: 5,
-  },
-  copyright: {
-    fontSize: 14,
-    color: '#999',
-  },
+  container: { flex: 1, backgroundColor: '#2C1810' },
+  header: { alignItems: 'center', padding: 24, backgroundColor: '#1A0E08', borderBottomWidth: 2, borderBottomColor: '#8B7355' },
+  avatar: { width: 86, height: 86, borderRadius: 43, borderWidth: 2, borderColor: '#8B7355', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', backgroundColor: '#3E2723' },
+  avatarImage: { width: '100%', height: '100%' },
+  username: { marginTop: 12, fontSize: 24, fontWeight: 'bold', color: '#F4E4C1', fontFamily: 'Lato_700Bold' },
+  role: { marginTop: 6, fontSize: 13, color: '#D6A84F', fontFamily: 'Lato_700Bold' },
+  currency: { marginTop: 8, color: '#A0826D', fontFamily: 'Lato_400Regular' },
+  section: { margin: 16, backgroundColor: '#3E2723', borderRadius: 10, borderWidth: 1, borderColor: '#8B7355' },
+  sectionTitle: { color: '#F4E4C1', fontSize: 16, fontWeight: '700', padding: 14, borderBottomWidth: 1, borderBottomColor: '#8B7355', fontFamily: 'Lato_700Bold' },
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14, gap: 10 },
+  rowText: { color: '#F4E4C1', fontFamily: 'Lato_400Regular' },
+  logoutWrap: { margin: 16 },
+  logoutBtn: { backgroundColor: '#8B7355', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
+  logoutDisabled: { backgroundColor: '#654321' },
+  logoutText: { color: '#F4E4C1', fontWeight: '700', fontFamily: 'Lato_700Bold' },
 });

@@ -1,6 +1,8 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { useFonts, Lato_400Regular, Lato_700Bold } from '@expo-google-fonts/lato';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Text } from 'react-native';
 import 'react-native-reanimated';
 
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -10,8 +12,28 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
+let textDefaultsApplied = false;
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const [fontsLoaded] = useFonts({
+    Lato_400Regular,
+    Lato_700Bold,
+  });
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
+  if (!textDefaultsApplied) {
+    const textComponent = Text as unknown as { defaultProps?: { style?: unknown } };
+    textComponent.defaultProps = textComponent.defaultProps || {};
+    textComponent.defaultProps.style = [
+      { fontFamily: 'Lato_400Regular' },
+      textComponent.defaultProps.style,
+    ];
+    textDefaultsApplied = true;
+  }
 
   return (
     <AuthProvider>

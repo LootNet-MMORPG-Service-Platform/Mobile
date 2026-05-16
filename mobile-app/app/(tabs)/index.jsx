@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import authService from '../../services/authService';
 
@@ -9,29 +10,33 @@ export default function HomeScreen() {
   const [profile, setProfile] = useState(null);
   const [itemCount, setItemCount] = useState(0);
 
-  useEffect(() => {
-    const loadDashboard = async () => {
-      const [profileResult, equipmentResult] = await Promise.all([
-        authService.getMobileProfile(),
-        authService.getEquipment(),
-      ]);
+  const loadDashboard = useCallback(async () => {
+    const [profileResult, mainInv, runInv] = await Promise.all([
+      authService.getMobileProfile(),
+      authService.getInventory('inventory'),
+      authService.getInventory('run'),
+    ]);
 
-      if (profileResult.success) {
-        setProfile(profileResult.data);
-      }
+    if (profileResult.success) {
+      setProfile(profileResult.data);
+    }
 
-      if (equipmentResult.success) {
-        setItemCount(equipmentResult.data?.length || 0);
-      }
-    };
-
-    loadDashboard();
+    const total =
+      (mainInv.success ? (mainInv.data?.length || 0) : 0) +
+      (runInv.success ? (runInv.data?.length || 0) : 0);
+    setItemCount(total);
   }, []);
+
+  useFocusEffect(useCallback(() => {
+    loadDashboard();
+  }, [loadDashboard]));
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <IconSymbol name="shield" size={48} color="#D6A84F" />
+        <View style={styles.logoMark}>
+          <IconSymbol name="shield" size={34} color="#1A0E08" />
+        </View>
         <Text style={styles.title}>LootNet</Text>
         <Text style={styles.subtitle}>Welcome back, {profile?.username || 'Player'}</Text>
       </View>
@@ -56,7 +61,7 @@ export default function HomeScreen() {
             <Text style={styles.actionTitle}>Equipment</Text>
             <Text style={styles.actionSubtitle}>Review generated loot</Text>
           </View>
-          <IconSymbol name="chevron.right" size={22} color="#D7C0A5" />
+          <IconSymbol name="chevron.right" size={22} color="#A0826D" />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/(tabs)/rewards')}>
@@ -65,7 +70,7 @@ export default function HomeScreen() {
             <Text style={styles.actionTitle}>Daily Reward</Text>
             <Text style={styles.actionSubtitle}>Generate today&apos;s item</Text>
           </View>
-          <IconSymbol name="chevron.right" size={22} color="#D7C0A5" />
+          <IconSymbol name="chevron.right" size={22} color="#A0826D" />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/(tabs)/battle')}>
@@ -74,16 +79,7 @@ export default function HomeScreen() {
             <Text style={styles.actionTitle}>Battle</Text>
             <Text style={styles.actionSubtitle}>Practice with local bots</Text>
           </View>
-          <IconSymbol name="chevron.right" size={22} color="#D7C0A5" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/(tabs)/market')}>
-          <IconSymbol name="store" size={24} color="#F4E4C1" />
-          <View style={styles.actionText}>
-            <Text style={styles.actionTitle}>Marketplace</Text>
-            <Text style={styles.actionSubtitle}>Buy and sell player gear</Text>
-          </View>
-          <IconSymbol name="chevron.right" size={22} color="#D7C0A5" />
+          <IconSymbol name="chevron.right" size={22} color="#A0826D" />
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -103,15 +99,27 @@ const styles = StyleSheet.create({
     borderBottomColor: '#8B7355',
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
+    fontSize: 34,
+    fontFamily: 'Tanenberg',
+    fontWeight: '900',
     color: '#F4E4C1',
     marginTop: 10,
     textTransform: 'uppercase',
   },
+  logoMark: {
+    width: 62,
+    height: 62,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#D6A84F',
+    borderWidth: 2,
+    borderColor: '#F4E4C1',
+  },
   subtitle: {
-    color: '#D7C0A5',
-    fontSize: 18,
+    color: '#A0826D',
+    fontSize: 15,
+    fontFamily: 'Lato_400Regular',
     marginTop: 6,
   },
   statsRow: {
@@ -131,12 +139,14 @@ const styles = StyleSheet.create({
   statValue: {
     color: '#F4E4C1',
     fontSize: 24,
+    fontFamily: 'Lato_700Bold',
     fontWeight: 'bold',
     marginTop: 8,
   },
   statLabel: {
-    color: '#D7C0A5',
-    fontSize: 16,
+    color: '#A0826D',
+    fontSize: 13,
+    fontFamily: 'Lato_400Regular',
     marginTop: 4,
   },
   actions: {
@@ -159,12 +169,14 @@ const styles = StyleSheet.create({
   },
   actionTitle: {
     color: '#F4E4C1',
-    fontSize: 19,
+    fontSize: 17,
+    fontFamily: 'Lato_700Bold',
     fontWeight: 'bold',
   },
   actionSubtitle: {
-    color: '#D7C0A5',
-    fontSize: 16,
+    color: '#A0826D',
+    fontSize: 13,
+    fontFamily: 'Lato_400Regular',
     marginTop: 2,
   },
 });

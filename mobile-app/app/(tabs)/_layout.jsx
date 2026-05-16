@@ -4,12 +4,9 @@ import { ActivityIndicator, View } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -27,7 +24,9 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: '#F4E4C1',
+        tabBarInactiveTintColor: '#A0826D',
+        tabBarStyle: { backgroundColor: '#1A0E08', borderTopColor: '#8B7355' },
         headerShown: false,
         tabBarButton: HapticTab,
       }}>
@@ -54,7 +53,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="battle"
         options={{
-          title: 'Battle',
+          title: 'Run',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="gamecontroller" color={color} />,
         }}
       />
