@@ -1,13 +1,27 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import SecureStorage from './secureStorage';
 
 const memoryStorage = new Map();
+const SENSITIVE_KEYS = new Set(['authToken', 'refreshToken']);
 
 const canUseWebStorage = () =>
   Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage;
 
+const isSensitiveKey = (key) => SENSITIVE_KEYS.has(key);
+
+const logStorageWarning = (operation, key, error) => {
+  if (__DEV__) {
+    console.warn(`Storage ${operation} fallback for ${key}`, error?.message || 'Unexpected storage error');
+  }
+};
+
 class Storage {
   static async getItem(key) {
+    if (isSensitiveKey(key)) {
+      return SecureStorage.getItem(key);
+    }
+
     try {
       if (canUseWebStorage()) {
         return window.localStorage.getItem(key);
@@ -15,12 +29,17 @@ class Storage {
 
       return await AsyncStorage.getItem(key);
     } catch (error) {
-      console.warn(`Storage getItem fallback for ${key}:`, error.message);
+      logStorageWarning('getItem', key, error);
       return memoryStorage.get(key) ?? null;
     }
   }
 
   static async setItem(key, value) {
+    if (isSensitiveKey(key)) {
+      await SecureStorage.setItem(key, value);
+      return;
+    }
+
     try {
       if (canUseWebStorage()) {
         window.localStorage.setItem(key, value);
@@ -29,12 +48,17 @@ class Storage {
 
       await AsyncStorage.setItem(key, value);
     } catch (error) {
-      console.warn(`Storage setItem fallback for ${key}:`, error.message);
+      logStorageWarning('setItem', key, error);
       memoryStorage.set(key, value);
     }
   }
 
   static async removeItem(key) {
+    if (isSensitiveKey(key)) {
+      await SecureStorage.removeItem(key);
+      return;
+    }
+
     try {
       if (canUseWebStorage()) {
         window.localStorage.removeItem(key);
@@ -43,7 +67,7 @@ class Storage {
 
       await AsyncStorage.removeItem(key);
     } catch (error) {
-      console.warn(`Storage removeItem fallback for ${key}:`, error.message);
+      logStorageWarning('removeItem', key, error);
     } finally {
       memoryStorage.delete(key);
     }

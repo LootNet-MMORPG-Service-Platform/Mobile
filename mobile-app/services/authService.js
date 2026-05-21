@@ -1,6 +1,35 @@
 import api from './api';
 import Storage from '../utils/storage';
 
+const logAuthWarning = (label, error) => {
+  if (__DEV__) {
+    console.warn(label, error?.message || 'Unexpected authentication error');
+  }
+};
+
+const TOKEN_EXPIRY_SKEW_SECONDS = 30;
+
+const decodeJwtPayload = (token) => {
+  try {
+    const payload = token?.split('.')?.[1];
+    if (!payload || typeof atob !== 'function') return null;
+
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=');
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+};
+
+const isUsableJwt = (token) => {
+  if (!token?.startsWith('eyJ') || !token.includes('.')) return false;
+
+  const payload = decodeJwtPayload(token);
+  if (!payload?.exp) return true;
+
+  return payload.exp > Math.floor(Date.now() / 1000) + TOKEN_EXPIRY_SKEW_SECONDS;
+};
 const itemId = (item) => item?.id ?? item?.Id;
 const itemName = (item) => item?.name ?? item?.Name;
 const isWeapon = (item) => item?.weaponType !== undefined || item?.WeaponType !== undefined || item?.cut !== undefined || item?.Cut !== undefined;
@@ -115,7 +144,7 @@ class AuthService {
 
       return { success: true, user: profileResponse };
     } catch (error) {
-      console.error('Login error:', error);
+      logAuthWarning('Login failed', error);
       return { success: false, error: error.message };
     }
   }
@@ -125,7 +154,7 @@ class AuthService {
       await api.register(userData);
       return { success: true, message: 'Registration successful' };
     } catch (error) {
-      console.error('Registration error:', error);
+      logAuthWarning('Registration failed', error);
       return { success: false, error: error.message };
     }
   }
@@ -135,7 +164,7 @@ class AuthService {
       const response = await api.resetPassword(oldPassword, newPassword);
       return { success: true, message: response };
     } catch (error) {
-      console.error('Password reset error:', error);
+      logAuthWarning('Password reset failed', error);
       return { success: false, error: error.message };
     }
   }
@@ -149,7 +178,7 @@ class AuthService {
       try {
         await api.refreshAccessToken();
       } catch (_error) {
-        console.log('Token refresh failed');
+        logAuthWarning('Token refresh failed');
       }
     }, 5 * 60 * 1000);
   }
@@ -184,7 +213,7 @@ class AuthService {
         await api.logout(refreshToken);
       }
     } catch (error) {
-      console.error('Logout error:', error);
+      logAuthWarning('Logout failed', error);
     } finally {
       await this.clearLocalAuth();
     }
@@ -207,11 +236,11 @@ class AuthService {
           return true;
         }
 
-        await Storage.multiRemove(['authToken', 'refreshToken']);
+        await Storage.multiRemove(['authToken', 'refreshToken', 'userData']);
       }
       return false;
     } catch (error) {
-      console.error('Error loading stored auth:', error);
+      logAuthWarning('Stored auth load failed', error);
       return false;
     }
   }
@@ -237,7 +266,7 @@ class AuthService {
 
       return { success: true };
     } catch (error) {
-      console.error('Token refresh error:', error);
+      logAuthWarning('Token refresh failed', error);
       return { success: false, error: error.message };
     }
   }
@@ -255,7 +284,7 @@ class AuthService {
       const response = await api.getMobileProfile();
       return { success: true, data: response };
     } catch (error) {
-      console.error('Mobile profile error:', error);
+      logAuthWarning('Mobile profile load failed', error);
       return { success: false, error: error.message };
     }
   }
@@ -265,7 +294,7 @@ class AuthService {
       const response = await api.getEquipment();
       return { success: true, data: uniqueItems([...flattenItemResponse(response), ...this.adventureRewards]) };
     } catch (error) {
-      console.error('Equipment error:', error);
+      logAuthWarning('Equipment load failed', error);
       return { success: true, data: uniqueItems(this.adventureRewards) };
     }
   }
@@ -581,7 +610,7 @@ class AuthService {
       this.rememberAdventureRewards([response]);
       return { success: true, data: normalizeItem(response) };
     } catch (error) {
-      console.error('Daily reward error:', error);
+      logAuthWarning('Daily reward failed', error);
       return { success: false, error: error.message };
     }
   }

@@ -10,8 +10,10 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { usePreventScreenCapture } from 'expo-screen-capture';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '../contexts/AuthContext';
+import { isSafeAuthError, sanitizeUsername, validatePassword, validatePasswordConfirmation, validateUsername } from '../utils/security';
 
 export default function RegisterScreen() {
   const [username, setUsername] = useState('');
@@ -20,27 +22,23 @@ export default function RegisterScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { register } = useAuth();
+  usePreventScreenCapture();
 
   const handleRegister = async () => {
-    if (!username.trim() || !password.trim() || !confirmPassword.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
+    const cleanUsername = sanitizeUsername(username);
+    const usernameError = validateUsername(cleanUsername);
+    const passwordError = validatePassword(password);
+    const confirmationError = validatePasswordConfirmation(password, confirmPassword);
 
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
-    }
-
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+    if (usernameError || passwordError || confirmationError) {
+      Alert.alert('Error', usernameError || passwordError || confirmationError);
       return;
     }
 
     setIsLoading(true);
     try {
       const result = await register({
-        username: username.trim(),
+        username: cleanUsername,
         password: password,
       });
       
@@ -48,7 +46,7 @@ export default function RegisterScreen() {
         Alert.alert('Success', 'Account created! Please login.');
         router.replace('/login');
       } else {
-        Alert.alert('Registration Failed', result.error || 'An error occurred');
+        Alert.alert('Registration Failed', isSafeAuthError(result.error) ? result.error : 'Unable to create account.');
       }
     } catch (_error) {
       Alert.alert('Error', 'An unexpected error occurred');
@@ -76,10 +74,13 @@ export default function RegisterScreen() {
               style={styles.input}
               placeholder="Username"
               value={username}
-              onChangeText={setUsername}
+              onChangeText={(value) => setUsername(value.slice(0, 32))}
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="next"
+              textContentType="username"
+              autoComplete="username-new"
+              maxLength={32}
             />
           </View>
 
@@ -92,6 +93,9 @@ export default function RegisterScreen() {
               onChangeText={setPassword}
               secureTextEntry
               returnKeyType="next"
+              textContentType="newPassword"
+              autoComplete="new-password"
+              maxLength={128}
             />
           </View>
 
@@ -104,6 +108,9 @@ export default function RegisterScreen() {
               onChangeText={setConfirmPassword}
               secureTextEntry
               returnKeyType="done"
+              textContentType="newPassword"
+              autoComplete="new-password"
+              maxLength={128}
               onSubmitEditing={handleRegister}
             />
           </View>

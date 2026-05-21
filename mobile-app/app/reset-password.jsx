@@ -10,8 +10,10 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { usePreventScreenCapture } from 'expo-screen-capture';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '../contexts/AuthContext';
+import { isSafeAuthError, validatePassword, validatePasswordConfirmation } from '../utils/security';
 
 export default function ResetPasswordScreen() {
   const [oldPassword, setOldPassword] = useState('');
@@ -20,20 +22,15 @@ export default function ResetPasswordScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { resetPassword } = useAuth();
+  usePreventScreenCapture();
 
   const handleResetPassword = async () => {
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all password fields');
-      return;
-    }
+    const oldPasswordError = validatePassword(oldPassword, 'Current password');
+    const newPasswordError = validatePassword(newPassword, 'New password');
+    const confirmationError = validatePasswordConfirmation(newPassword, confirmPassword);
 
-    if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'New passwords do not match');
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      Alert.alert('Error', 'New password must be at least 6 characters');
+    if (oldPasswordError || newPasswordError || confirmationError) {
+      Alert.alert('Error', oldPasswordError || newPasswordError || confirmationError);
       return;
     }
 
@@ -45,7 +42,7 @@ export default function ResetPasswordScreen() {
           { text: 'OK', onPress: () => router.replace('/(tabs)/profile') },
         ]);
       } else {
-        Alert.alert('Password Change Failed', result.error || 'Unable to change password');
+        Alert.alert('Password Change Failed', isSafeAuthError(result.error) ? result.error : 'Unable to change password');
       }
     } catch (_error) {
       Alert.alert('Error', 'An unexpected error occurred');
@@ -80,6 +77,9 @@ export default function ResetPasswordScreen() {
             value={oldPassword}
             onChangeText={setOldPassword}
             secureTextEntry
+            textContentType="password"
+            autoComplete="password"
+            maxLength={128}
           />
         </View>
 
@@ -92,6 +92,9 @@ export default function ResetPasswordScreen() {
             value={newPassword}
             onChangeText={setNewPassword}
             secureTextEntry
+            textContentType="newPassword"
+            autoComplete="new-password"
+            maxLength={128}
           />
         </View>
 
@@ -104,6 +107,9 @@ export default function ResetPasswordScreen() {
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry
+            textContentType="newPassword"
+            autoComplete="new-password"
+            maxLength={128}
             onSubmitEditing={handleResetPassword}
           />
         </View>

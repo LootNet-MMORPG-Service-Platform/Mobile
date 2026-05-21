@@ -10,8 +10,10 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { usePreventScreenCapture } from 'expo-screen-capture';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '../contexts/AuthContext';
+import { isSafeAuthError, sanitizeUsername, validatePassword, validateUsername } from '../utils/security';
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
@@ -20,22 +22,27 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
+  usePreventScreenCapture();
 
   const handleLogin = async () => {
-    if (!username.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter both username and password');
+    const cleanUsername = sanitizeUsername(username);
+    const usernameError = validateUsername(cleanUsername);
+    const passwordError = validatePassword(password);
+
+    if (usernameError || passwordError) {
+      Alert.alert('Error', usernameError || passwordError);
       return;
     }
 
     setIsLoading(true);
     try {
-      const result = await login(username.trim(), password);
+      const result = await login(cleanUsername, password);
       
       if (result.success) {
         Alert.alert('Success', 'Welcome back!');
         router.replace('/(tabs)');
       } else {
-        Alert.alert('Login Failed', result.error || 'An error occurred');
+        Alert.alert('Login Failed', isSafeAuthError(result.error) ? result.error : 'Unable to sign in.');
       }
     } catch (_error) {
       Alert.alert('Error', 'An unexpected error occurred');
@@ -63,10 +70,13 @@ export default function LoginScreen() {
               style={styles.input}
               placeholder="Username"
               value={username}
-              onChangeText={setUsername}
+              onChangeText={(value) => setUsername(value.slice(0, 32))}
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="next"
+              textContentType="username"
+              autoComplete="username"
+              maxLength={32}
             />
           </View>
 
@@ -79,6 +89,9 @@ export default function LoginScreen() {
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
               returnKeyType="done"
+              textContentType="password"
+              autoComplete="password"
+              maxLength={128}
               onSubmitEditing={handleLogin}
             />
             <TouchableOpacity

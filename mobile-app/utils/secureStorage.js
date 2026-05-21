@@ -1,86 +1,105 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import CryptoJS from 'crypto-js';
+import * as ExpoSecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
-// In a real app, you would use a more secure key management system
-// For demo purposes, we'll use a simple approach
-const ENCRYPTION_KEY = 'your-secure-encryption-key-here'; // Replace with environment variable
+const KEY_PREFIX = 'lootnet_';
+const KEYCHAIN_SERVICE = 'lootnet.auth';
+const SECURE_STORE_OPTIONS = {
+  keychainService: KEYCHAIN_SERVICE,
+  keychainAccessible: ExpoSecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+};
+const memoryFallback = new Map();
+
+const toStorageValue = (value) => (typeof value === 'string' ? value : JSON.stringify(value));
+const fromStorageValue = (value) => value ?? null;
+const secureKey = (key) => `${KEY_PREFIX}${key}`;
+
+const canUseWebStorage = () =>
+  Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage;
+
+const logSecureStorageWarning = (operation, error) => {
+  if (__DEV__) {
+    console.warn(`Secure storage ${operation} failed`, error?.message || 'Unexpected storage error');
+  }
+};
 
 class SecureStorage {
-  static async setItem(key, value) {
+  static async canUseNativeSecureStore() {
+    if (Platform.OS === 'web') return false;
+
     try {
-      // Encrypt the value before storing
-      const encryptedValue = CryptoJS.AES.encrypt(JSON.stringify(value), ENCRYPTION_KEY).toString();
-      await AsyncStorage.setItem(`secure_${key}`, encryptedValue);
+      return await ExpoSecureStore.isAvailableAsync();
+    } catch {
+      return false;
+    }
+  }
+
+  static async setItem(key, value) {
+    const resolvedKey = secureKey(key);
+    const resolvedValue = toStorageValue(value);
+
+    try {
+      if (await SecureStorage.canUseNativeSecureStore()) {
+        await ExpoSecureStore.setItemAsync(resolvedKey, resolvedValue, SECURE_STORE_OPTIONS);
+        memoryFallback.delete(resolvedKey);
+        return true;
+      }
+
+      if (canUseWebStorage()) {
+        window.localStorage.setItem(resolvedKey, resolvedValue);
+      } else {
+        await AsyncStorage.setItem(resolvedKey, resolvedValue);
+      }
+      memoryFallback.delete(resolvedKey);
       return true;
     } catch (error) {
-      console.error('Secure storage set error:', error);
+      logSecureStorageWarning('set', error);
+      memoryFallback.set(resolvedKey, resolvedValue);
       return false;
     }
   }
 
   static async getItem(key) {
+    const resolvedKey = secureKey(key);
+
     try {
-      const encryptedValue = await AsyncStorage.getItem(`secure_${key}`);
-      if (!encryptedValue) {
-        return null;
+      if (await SecureStorage.canUseNativeSecureStore()) {
+        return fromStorageValue(await ExpoSecureStore.getItemAsync(resolvedKey, SECURE_STORE_OPTIONS));
       }
 
-      // Decrypt the value
-      const bytes = CryptoJS.AES.decrypt(encryptedValue, ENCRYPTION_KEY);
-      const decryptedValue = bytes.toString(CryptoJS.enc.Utf8);
-      
-      if (!decryptedValue) {
-        return null;
+      if (canUseWebStorage()) {
+        return fromStorageValue(window.localStorage.getItem(resolvedKey));
       }
 
-      return JSON.parse(decryptedValue);
+      return fromStorageValue(await AsyncStorage.getItem(resolvedKey));
     } catch (error) {
-      console.error('Secure storage get error:', error);
-      return null;
+      logSecureStorageWarning('get', error);
+      return memoryFallback.get(resolvedKey) ?? null;
     }
   }
 
   static async removeItem(key) {
+    const resolvedKey = secureKey(key);
+
     try {
-      await AsyncStorage.removeItem(`secure_${key}`);
+      if (await SecureStorage.canUseNativeSecureStore()) {
+        await ExpoSecureStore.deleteItemAsync(resolvedKey, SECURE_STORE_OPTIONS);
+      } else if (canUseWebStorage()) {
+        window.localStorage.removeItem(resolvedKey);
+      } else {
+        await AsyncStorage.removeItem(resolvedKey);
+      }
       return true;
     } catch (error) {
-      console.error('Secure storage remove error:', error);
+      logSecureStorageWarning('remove', error);
       return false;
+    } finally {
+      memoryFallback.delete(resolvedKey);
     }
   }
 
-  static async clear() {
-    try {
-      const keys = await AsyncStorage.getAllKeys();
-      const secureKeys = keys.filter(key => key.startsWith('secure_'));
-      await AsyncStorage.multiRemove(secureKeys);
-      return true;
-    } catch (error) {
-      console.error('Secure storage clear error:', error);
-      return false;
-    }
-  }
-
-  // For non-sensitive data, use regular AsyncStorage
-  static async setRegularItem(key, value) {
-    try {
-      await AsyncStorage.setItem(key, JSON.stringify(value));
-      return true;
-    } catch (error) {
-      console.error('Regular storage set error:', error);
-      return false;
-    }
-  }
-
-  static async getRegularItem(key) {
-    try {
-      const value = await AsyncStorage.getItem(key);
-      return value ? JSON.parse(value) : null;
-    } catch (error) {
-      console.error('Regular storage get error:', error);
-      return null;
-    }
+  static async multiRemove(keys) {
+    await Promise.all(keys.map((key) => SecureStorage.removeItem(key)));
   }
 }
 

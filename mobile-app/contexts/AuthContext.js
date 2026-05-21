@@ -1,7 +1,15 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import authService from '../services/authService';
 
 const AuthContext = createContext();
+const BACKGROUND_SESSION_TIMEOUT_MS = 15 * 60 * 1000;
+
+const logAuthContextWarning = (label, error) => {
+  if (__DEV__) {
+    console.warn(label, error?.message || 'Unexpected auth context error');
+  }
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -15,6 +23,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const backgroundedAtRef = useRef(null);
 
   useEffect(() => {
     // Check for stored authentication on app start
@@ -26,13 +35,35 @@ export const AuthProvider = ({ children }) => {
           setIsAuthenticated(true);
         }
       } catch (error) {
-        console.error('Auth check error:', error);
+        logAuthContextWarning('Auth check failed', error);
       } finally {
         setIsLoading(false);
       }
     };
 
     checkAuth();
+  }, []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextState) => {
+      if (nextState === 'background' || nextState === 'inactive') {
+        backgroundedAtRef.current = Date.now();
+        return;
+      }
+
+      if (nextState === 'active' && backgroundedAtRef.current) {
+        const backgroundTime = Date.now() - backgroundedAtRef.current;
+        backgroundedAtRef.current = null;
+
+        if (backgroundTime >= BACKGROUND_SESSION_TIMEOUT_MS) {
+          await authService.clearLocalAuth();
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      }
+    });
+
+    return () => subscription.remove();
   }, []);
 
   const login = async (username, password) => {
@@ -44,7 +75,7 @@ export const AuthProvider = ({ children }) => {
       }
       return result;
     } catch (error) {
-      console.error('Login error:', error);
+      logAuthContextWarning('Login failed', error);
       return { success: false, error: error.message };
     }
   };
@@ -54,7 +85,7 @@ export const AuthProvider = ({ children }) => {
       const result = await authService.register(userData);
       return result;
     } catch (error) {
-      console.error('Registration error:', error);
+      logAuthContextWarning('Registration failed', error);
       return { success: false, error: error.message };
     }
   };
@@ -65,7 +96,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setIsAuthenticated(false);
     } catch (error) {
-      console.error('Logout error:', error);
+      logAuthContextWarning('Logout failed', error);
     }
   };
 
@@ -74,7 +105,7 @@ export const AuthProvider = ({ children }) => {
       const result = await authService.resetPassword(oldPassword, newPassword);
       return result;
     } catch (error) {
-      console.error('Password reset error:', error);
+      logAuthContextWarning('Password reset failed', error);
       return { success: false, error: error.message };
     }
   };
@@ -87,7 +118,7 @@ export const AuthProvider = ({ children }) => {
       }
       return result;
     } catch (error) {
-      console.error('Profile update error:', error);
+      logAuthContextWarning('Profile update failed', error);
       return { success: false, error: error.message };
     }
   };
