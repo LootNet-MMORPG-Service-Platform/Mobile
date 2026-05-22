@@ -31,9 +31,31 @@ const getItemCategory = (item) => {
 };
 
 const formatCategory = (category) => {
-  if (category === 0 || category === 'Weapon') return 'Weapon';
-  if (category === 1 || category === 'Armor') return 'Armor';
-  return category || 'Item';
+  return normalizeCategory(category) || 'Item';
+};
+
+const normalizeCategory = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  const raw = String(value).toLowerCase();
+  if (value === 0 || raw === '0' || raw === 'weapon' || raw === 'weapons') return 'Weapon';
+  if (value === 1 || raw === '1' || raw === 'armor' || raw === 'armors') return 'Armor';
+  return String(value);
+};
+
+const listingMatchesCategory = (listing, selectedCategory) => {
+  const normalized = normalizeCategory(selectedCategory);
+  if (!normalized) return true;
+  return normalizeCategory(listing?.category) === normalized;
+};
+
+const mergeListings = (items = []) => {
+  const seen = new Set();
+  return items.filter((listing) => {
+    const key = listing?.id || listing?.itemId;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 };
 
 export default function MarketScreen() {
@@ -64,9 +86,8 @@ export default function MarketScreen() {
       ]);
 
       if (listingResult.success) {
-        setListings(listingResult.data || []);
+        setListings(mergeListings(listingResult.data || []));
       } else {
-        setListings([]);
         setLoadError(listingResult.error || 'Failed to load listings');
       }
 
@@ -138,13 +159,29 @@ export default function MarketScreen() {
 
     if (result.success) {
       Alert.alert('Listed', `${selectedItem?.name || 'Item'} is now listed on the market.`);
+      const createdListing = result.data || {
+        id: `listed-${selectedItemId}`,
+        itemId: selectedItemId,
+        itemName: selectedItem?.name || 'Listed item',
+        price: numericPrice,
+        category: getItemCategory(selectedItem),
+      };
+      setListings((current) => mergeListings([createdListing, ...current]));
+      setEquipment((current) => current.filter((item) => item.id !== selectedItemId));
       setSelectedItemId(null);
       setPrice('');
-      await loadMarket();
+      setActiveMode('buy');
+      setCategory(null);
     } else {
       Alert.alert('Listing Failed', result.error || 'Unable to list this item');
     }
   };
+
+  const visibleListings = useMemo(() => (
+    listings
+      .filter((listing) => listingMatchesCategory(listing, category))
+      .sort((a, b) => sort === 'desc' ? Number(b.price) - Number(a.price) : Number(a.price) - Number(b.price))
+  ), [listings, category, sort]);
 
   const renderListing = (listing) => (
     <View key={listing.id} style={styles.listing}>
@@ -204,7 +241,7 @@ export default function MarketScreen() {
       <View style={styles.header}>
         <IconSymbol name="store" size={42} color="#D6A84F" />
         <Text style={styles.title}>Marketplace</Text>
-        <Text style={styles.subtitle}>Buy gear from other players or list your own loot.</Text>
+        <Text style={styles.subtitle}>Buy and sell player gear.</Text>
       </View>
 
       <View style={styles.modeSwitch}>
@@ -262,8 +299,8 @@ export default function MarketScreen() {
               <Text style={styles.emptyText}>Loading listings...</Text>
             ) : loadError ? (
               <Text style={styles.errorText}>{loadError}</Text>
-            ) : listings.length > 0 ? (
-              listings.map(renderListing)
+            ) : visibleListings.length > 0 ? (
+              visibleListings.map(renderListing)
             ) : (
               <Text style={styles.emptyText}>No active listings found.</Text>
             )}
@@ -325,9 +362,9 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: 15,
     fontFamily: 'Lato_400Regular',
-    color: '#D7C0A5',
+    color: '#A0826D',
     textAlign: 'center',
     marginTop: 6,
   },

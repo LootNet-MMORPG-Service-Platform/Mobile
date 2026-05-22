@@ -21,10 +21,11 @@ export default function HomeScreen() {
       setProfile(profileResult.data);
     }
 
-    const total =
-      (mainInv.success ? (mainInv.data?.length || 0) : 0) +
-      (runInv.success ? (runInv.data?.length || 0) : 0);
-    setItemCount(total);
+    const uniqueItemIds = new Set([
+      ...(mainInv.success ? (mainInv.data || []) : []),
+      ...(runInv.success ? (runInv.data || []) : []),
+    ].map((item) => item?.id ?? item?.Id).filter(Boolean));
+    setItemCount(uniqueItemIds.size);
   }, []);
 
   useFocusEffect(useCallback(() => {
@@ -37,7 +38,7 @@ export default function HomeScreen() {
         <View style={styles.logoMark}>
           <IconSymbol name="shield" size={34} color="#1A0E08" />
         </View>
-        <Text style={styles.title}>LootNet</Text>
+        <Text style={styles.title}>LOOTNET</Text>
         <Text style={styles.subtitle}>Welcome back, {profile?.username || 'Player'}</Text>
       </View>
 
@@ -76,8 +77,8 @@ export default function HomeScreen() {
         <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/(tabs)/battle')}>
           <IconSymbol name="gamecontroller" size={24} color="#F4E4C1" />
           <View style={styles.actionText}>
-            <Text style={styles.actionTitle}>Battle</Text>
-            <Text style={styles.actionSubtitle}>Practice with local bots</Text>
+            <Text style={styles.actionTitle}>Adventure</Text>
+            <Text style={styles.actionSubtitle}>Go on an adventure</Text>
           </View>
           <IconSymbol name="chevron.right" size={22} color="#A0826D" />
         </TouchableOpacity>
@@ -99,12 +100,10 @@ const styles = StyleSheet.create({
     borderBottomColor: '#8B7355',
   },
   title: {
-    fontSize: 34,
-    fontFamily: 'Tanenberg',
-    fontWeight: '900',
+    fontSize: 42,
+    fontFamily: 'UnifrakturCook_700Bold',
     color: '#F4E4C1',
-    marginTop: 10,
-    textTransform: 'uppercase',
+    marginTop: 8,
   },
   logoMark: {
     width: 62,

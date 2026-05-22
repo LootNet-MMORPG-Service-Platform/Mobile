@@ -32,6 +32,7 @@ const MAPPING = {
   eye: 'visibility',
   'eye.slash': 'visibility-off',
   flame: 'whatshot',
+  'forward.end.fill': 'skip-next',
   gamecontroller: 'sports-esports',
   gift: 'card-giftcard',
   inventory: 'inventory-2',

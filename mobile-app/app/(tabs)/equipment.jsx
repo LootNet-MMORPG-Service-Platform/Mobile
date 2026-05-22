@@ -14,10 +14,6 @@ const MENU = [
 
 const FILTERS = ['all', 'weapon', 'armor'];
 const SLOTS = [1, 2, 3, 4];
-const DIFFICULTIES = [
-  { key: 'easy', label: 'Scout', description: 'A lighter path with one foe' },
-  { key: 'normal', label: 'Warband', description: 'Standard challenge' },
-];
 
 const fmt = (v) => Number(v ?? 0).toFixed(1);
 const isWeapon = (i) => i?.weaponType !== undefined;
@@ -32,8 +28,6 @@ export default function EquipmentScreen() {
   const [marketInventory, setMarketInventory] = useState([]);
   const [equipPool, setEquipPool] = useState([]);
   const [equipmentSlots, setEquipmentSlots] = useState({});
-  const [selectedRunLoadout, setSelectedRunLoadout] = useState([]);
-  const [runDifficulty, setRunDifficulty] = useState('easy');
   const [detailItem, setDetailItem] = useState(null);
 
   const applyFilter = useCallback((arr) => (
@@ -59,21 +53,18 @@ export default function EquipmentScreen() {
       setInventory(inv.success ? (inv.data || []) : []);
       if (!inv.success) Alert.alert('Error', inv.error || 'Cannot load inventory');
     } else if (view === 'run') {
-      const [inv, runInv] = await Promise.all([
+      const [inv, runInv, equipped] = await Promise.all([
         authService.getInventory('inventory'),
         authService.getInventory('run'),
+        authService.getEquippedItems(),
       ]);
       const invData = inv.success ? (inv.data || []) : [];
       setInventory(invData);
-      setRunInventory(runInv.success ? (runInv.data || []) : []);
+      setRunInventory(runData
+        ? (runInv.success ? (runInv.data || []) : [])
+        : (equipped.success ? (equipped.data || []) : []));
       if (!inv.success || !runInv.success) Alert.alert('Error', 'Cannot load adventure gear');
 
-      if (!runData) {
-        setSelectedRunLoadout((prev) => {
-          const valid = new Set(invData.map((x) => x.id));
-          return prev.filter((id) => valid.has(id));
-        });
-      }
     } else if (view === 'market') {
       const market = await authService.getInventory('market');
       setMarketInventory(market.success ? (market.data || []) : []);
@@ -94,31 +85,22 @@ export default function EquipmentScreen() {
     loadData();
   }, [loadData]));
 
-  const pushToRunLoadout = (itemId) => {
-    if (activeRun) return;
-    setSelectedRunLoadout((prev) => (prev.includes(itemId) ? prev : [...prev, itemId]));
-  };
-
-  const removeFromRunLoadout = (itemId) => {
-    if (activeRun) return;
-    setSelectedRunLoadout((prev) => prev.filter((x) => x !== itemId));
-  };
 
   const startRunWithLoadout = async () => {
     if (activeRun) {
       Alert.alert('Run active', 'You already have an active run.');
       return;
     }
-    if (!selectedRunLoadout.length) {
-      Alert.alert('Run', 'Select adventure gear first.');
+    const equippedItems = await authService.getEquippedItems();
+    if (!equippedItems.success || !(equippedItems.data || []).length) {
+      Alert.alert('Run', 'Equip at least one item before starting a run.');
       return;
     }
-    const result = await authService.startRun(selectedRunLoadout, runDifficulty);
+    const result = await authService.startRun([]);
     if (!result.success) {
       Alert.alert('Start failed', result.error || 'Cannot start run');
       return;
     }
-    setSelectedRunLoadout([]);
     await loadData();
   };
 
@@ -165,17 +147,11 @@ export default function EquipmentScreen() {
     [filteredEquipPool, equippedItemIds]
   );
 
-  const runLoadoutItems = useMemo(() => {
-    const byId = new Map(inventory.map((x) => [x.id, x]));
-    return selectedRunLoadout.map((id) => byId.get(id)).filter(Boolean);
-  }, [selectedRunLoadout, inventory]);
-
-  const inRunLoadout = useMemo(() => new Set(selectedRunLoadout), [selectedRunLoadout]);
 
   const renderMiniCard = (item, options = {}) => {
-    const { showStats = false, extraAction = null } = options;
+    const { showStats = false, extraAction = null, horizontal = false } = options;
     return (
-      <TouchableOpacity key={item.id} style={styles.miniCard} onPress={() => setDetailItem(item)}>
+      <TouchableOpacity key={item.id} style={[styles.miniCard, horizontal && styles.miniCardHorizontal]} onPress={() => setDetailItem(item)}>
         <IconSymbol name={isWeapon(item) ? 'sword' : 'shield'} size={22} color="#F4E4C1" />
         {showStats && (
           <Text style={styles.miniStats}>
@@ -190,8 +166,9 @@ export default function EquipmentScreen() {
   const showFilters = !!view;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}><Text style={styles.title}>Inventory</Text></View>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.container}>
+        <View style={styles.header}><Text style={styles.title}>INVENTORY</Text></View>
 
       {!view && (
         <View style={styles.menuWrap}>
@@ -245,56 +222,22 @@ export default function EquipmentScreen() {
                 <Text style={styles.lockInfo}>Run is active. Run inventory editing is blocked.</Text>
               ) : (
                 <TouchableOpacity style={styles.startBtn} onPress={startRunWithLoadout}>
-                  <Text style={styles.startTxt}>Start Run ({selectedRunLoadout.length} selected)</Text>
+                  <Text style={styles.startTxt}>Start Run (equipped gear at risk)</Text>
                 </TouchableOpacity>
               )}
 
               {!activeRun && (
                 <>
-                  <Text style={styles.sectionLabel}>Difficulty</Text>
-                  <View style={styles.difficultyRow}>
-                    {DIFFICULTIES.map((difficulty) => (
-                      <TouchableOpacity
-                        key={difficulty.key}
-                        style={[styles.difficultyBtn, runDifficulty === difficulty.key && styles.difficultyBtnActive]}
-                        onPress={() => setRunDifficulty(difficulty.key)}
-                      >
-                        <Text style={[styles.difficultyTitle, runDifficulty === difficulty.key && styles.difficultyTitleActive]}>
-                          {difficulty.label}
-                        </Text>
-                        <Text style={[styles.difficultyDesc, runDifficulty === difficulty.key && styles.difficultyDescActive]}>
-                          {difficulty.description}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  <Text style={styles.sectionLabel}>Selected Adventure Gear</Text>
+                  <Text style={styles.sectionLabel}>Equipped Gear at Risk</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalList} contentContainerStyle={styles.horizontalListContent}>
-                    {runLoadoutItems.map((i) => renderMiniCard(i, {
-                      showStats: true,
-                      extraAction: (
-                        <TouchableOpacity style={styles.actionBtn} onPress={() => removeFromRunLoadout(i.id)}>
-                          <Text style={styles.actionTxt}>Remove</Text>
-                        </TouchableOpacity>
-                      ),
-                    }))}
-                    {runLoadoutItems.length === 0 && <Text style={styles.helper}>No selected items.</Text>}
+                    {filteredRun.map((i) => renderMiniCard(i, { showStats: true, horizontal: true }))}
+                    {filteredRun.length === 0 && <Text style={styles.helper}>No equipped items.</Text>}
                   </ScrollView>
 
-                  <Text style={styles.sectionLabel}>Choose Gear</Text>
+                  <Text style={styles.sectionLabel}>Inventory Gear</Text>
+                  <Text style={styles.lockInfo}>Only equipped items are sent into a run and can be lost.</Text>
                   <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-                    {filteredInventory.map((i) => renderMiniCard(i, {
-                      showStats: true,
-                      extraAction: (
-                        <TouchableOpacity
-                          style={[styles.actionBtn, inRunLoadout.has(i.id) && styles.actionBtnActive]}
-                          onPress={() => pushToRunLoadout(i.id)}
-                        >
-                          <Text style={styles.actionTxt}>{inRunLoadout.has(i.id) ? 'Added' : 'Take Along'}</Text>
-                        </TouchableOpacity>
-                      ),
-                    }))}
+                    {filteredInventory.map((i) => renderMiniCard(i, { showStats: true }))}
                   </ScrollView>
                 </>
               )}
@@ -377,25 +320,27 @@ export default function EquipmentScreen() {
         </>
       )}
 
-      {detailItem && (
-        <TouchableOpacity style={styles.modalBg} onPress={() => setDetailItem(null)}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>{detailItem.name}</Text>
-            <Text style={styles.modalLine}>{isWeapon(detailItem) ? `Cut ${fmt(detailItem.cut)} / Blunt ${fmt(detailItem.blunt)}` : `Cut Res ${fmt(detailItem.cutResistance)} / Blunt Res ${fmt(detailItem.bluntResistance)}`}</Text>
-            {!!detailItem.elements?.length && (
-              <Text style={styles.modalLine}>Elements: {detailItem.elements.map((e) => e.type).join(', ')}</Text>
-            )}
-          </View>
-        </TouchableOpacity>
-      )}
+        {detailItem && (
+          <TouchableOpacity style={styles.modalBg} onPress={() => setDetailItem(null)}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>{detailItem.name}</Text>
+              <Text style={styles.modalLine}>{isWeapon(detailItem) ? `Cut ${fmt(detailItem.cut)} / Blunt ${fmt(detailItem.blunt)}` : `Cut Res ${fmt(detailItem.cutResistance)} / Blunt Res ${fmt(detailItem.bluntResistance)}`}</Text>
+              {!!detailItem.elements?.length && (
+                <Text style={styles.modalLine}>Elements: {detailItem.elements.map((e) => e.type).join(', ')}</Text>
+              )}
+            </View>
+          </TouchableOpacity>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#1A0E08' },
   container: { flex: 1, backgroundColor: '#2C1810' },
-  header: { backgroundColor: '#1A0E08', paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: '#8B7355' },
-  title: { color: '#F4E4C1', textAlign: 'center', fontSize: 20, fontWeight: '700', fontFamily: 'Lato_700Bold' },
+  header: { alignItems: 'center', padding: 24, backgroundColor: '#1A0E08', borderBottomWidth: 2, borderBottomColor: '#8B7355' },
+  title: { color: '#F4E4C1', textAlign: 'center', fontSize: 28, fontWeight: '700', fontFamily: 'Lato_700Bold' },
   menuWrap: { padding: 10 },
   menuBtn: { height: 46, marginBottom: 8, backgroundColor: '#3E2723', borderColor: '#8B7355', borderWidth: 1, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   menuTxt: { color: '#F4E4C1', fontWeight: '700', fontFamily: 'Lato_700Bold' },
@@ -413,18 +358,12 @@ const styles = StyleSheet.create({
   lockInfo: { color: '#A0826D', marginHorizontal: 10, marginBottom: 8, fontFamily: 'Lato_400Regular' },
   helper: { color: '#A0826D', marginHorizontal: 10, marginBottom: 8, fontFamily: 'Lato_400Regular' },
   sectionLabel: { color: '#D6A84F', marginHorizontal: 10, marginBottom: 6, fontSize: 12, fontWeight: '700', fontFamily: 'Lato_700Bold' },
-  difficultyRow: { flexDirection: 'row', gap: 8, marginHorizontal: 10, marginBottom: 10 },
-  difficultyBtn: { flex: 1, backgroundColor: '#3E2723', borderWidth: 1, borderColor: '#8B7355', borderRadius: 8, padding: 10 },
-  difficultyBtnActive: { backgroundColor: '#D6A84F', borderColor: '#F4E4C1' },
-  difficultyTitle: { color: '#F4E4C1', fontSize: 13, fontWeight: '700', fontFamily: 'Lato_700Bold' },
-  difficultyTitleActive: { color: '#2C1810' },
-  difficultyDesc: { color: '#A0826D', fontSize: 11, marginTop: 4, fontFamily: 'Lato_400Regular' },
-  difficultyDescActive: { color: '#3E2723' },
   list: { flex: 1, paddingHorizontal: 10 },
-  listContent: { paddingBottom: 16 },
+  listContent: { paddingBottom: 16, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   horizontalList: { maxHeight: 126, marginBottom: 8 },
   horizontalListContent: { paddingHorizontal: 10, alignItems: 'center' },
-  miniCard: { width: 148, minHeight: 84, backgroundColor: '#3E2723', borderWidth: 1, borderColor: '#8B7355', borderRadius: 8, padding: 8, marginRight: 8, marginBottom: 8, justifyContent: 'center', alignItems: 'center' },
+  miniCard: { width: '48%', minHeight: 84, backgroundColor: '#3E2723', borderWidth: 1, borderColor: '#8B7355', borderRadius: 8, padding: 8, marginBottom: 8, justifyContent: 'center', alignItems: 'center' },
+  miniCardHorizontal: { width: 148, marginRight: 8 },
   miniStats: { color: '#A0826D', marginTop: 6, fontSize: 11, textAlign: 'center', fontFamily: 'Lato_400Regular' },
   actionBtn: { marginTop: 6, backgroundColor: '#8B7355', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5 },
   actionBtnActive: { backgroundColor: '#4F9D69' },

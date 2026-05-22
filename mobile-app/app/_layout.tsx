@@ -1,8 +1,10 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts, Lato_400Regular, Lato_700Bold } from '@expo-google-fonts/lato';
+import { UnifrakturMaguntia_400Regular } from '@expo-google-fonts/unifrakturmaguntia';
+import { UnifrakturCook_700Bold } from '@expo-google-fonts/unifrakturcook';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Text } from 'react-native';
+import { Text, TextInput } from 'react-native';
 import 'react-native-reanimated';
 
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -19,6 +21,8 @@ export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     Lato_400Regular,
     Lato_700Bold,
+    UnifrakturMaguntia_400Regular,
+    UnifrakturCook_700Bold,
   });
 
   if (!fontsLoaded) {
@@ -27,10 +31,16 @@ export default function RootLayout() {
 
   if (!textDefaultsApplied) {
     const textComponent = Text as unknown as { defaultProps?: { style?: unknown } };
+    const textInputComponent = TextInput as unknown as { defaultProps?: { style?: unknown } };
     textComponent.defaultProps = textComponent.defaultProps || {};
+    textInputComponent.defaultProps = textInputComponent.defaultProps || {};
     textComponent.defaultProps.style = [
       { fontFamily: 'Lato_400Regular' },
       textComponent.defaultProps.style,
+    ];
+    textInputComponent.defaultProps.style = [
+      { fontFamily: 'Lato_400Regular' },
+      textInputComponent.defaultProps.style,
     ];
     textDefaultsApplied = true;
   }

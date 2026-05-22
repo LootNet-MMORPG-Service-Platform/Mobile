@@ -87,6 +87,47 @@ const normalizeListing = (listing) => ({
   category: listing?.category ?? listing?.Category,
 });
 
+const normalizeCategory = (category) => {
+  if (category === null || category === undefined || category === '') return null;
+  const raw = String(category).toLowerCase();
+  if (category === 0 || raw === '0' || raw === 'weapon' || raw === 'weapons') return 'Weapon';
+  if (category === 1 || raw === '1' || raw === 'armor' || raw === 'armors') return 'Armor';
+  return String(category);
+};
+
+const listingMatchesCategory = (listing, category) => {
+  const normalizedCategory = normalizeCategory(category);
+  if (!normalizedCategory) return true;
+  return normalizeCategory(listing?.category) === normalizedCategory;
+};
+
+const flattenListingResponse = (response) => {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.listings)) return response.listings;
+  if (Array.isArray(response?.Listings)) return response.Listings;
+  if (Array.isArray(response?.items)) return response.items;
+  if (Array.isArray(response?.Items)) return response.Items;
+  if (Array.isArray(response?.data)) return response.data;
+  if (Array.isArray(response?.Data)) return response.Data;
+  return [];
+};
+
+const uniqueListings = (listings) => {
+  const seen = new Set();
+  return listings.map(normalizeListing).filter((listing) => {
+    const key = listing?.itemId || listing?.id;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const OPPONENT_TYPES = [
+  { name: 'Raider', hp: 35, position: 2 },
+  { name: 'Duelist', hp: 42, position: 2 },
+  { name: 'Guard', hp: 50, position: 3 },
+];
+
 class AuthService {
   constructor() {
     this.user = null;
@@ -304,7 +345,7 @@ class AuthService {
 
     try {
       const response = await api.getInventory(scope);
-      const apiItems = uniqueItems([...flattenItemResponse(response), ...(scope === 'market' ? [] : this.adventureRewards)]);
+      const apiItems = uniqueItems([...flattenItemResponse(response), ...(scope === 'inventory' ? this.adventureRewards : [])]);
 
       if (scope === 'market') {
         const localItems = (await this.getAllKnownItems()).filter((item) => listedIds.has(item.id));
@@ -338,6 +379,12 @@ class AuthService {
     const slots = await this.getEquipmentSlots();
     if (!slots.success) return slots;
     return { success: true, data: Object.values(slots.data || {}).filter(Boolean) };
+  }
+
+  async getEquippedItemIds() {
+    const equipped = await this.getEquippedItems();
+    if (!equipped.success) return [];
+    return [...new Set((equipped.data || []).map((item) => item?.id ?? item?.Id).filter(Boolean))];
   }
 
   async getEquipmentSlots() {
@@ -410,26 +457,31 @@ class AuthService {
     return { success: true };
   }
 
-  createLocalRun(itemIds, difficulty) {
+  createLocalRun(itemIds) {
     this.localRun = {
       id: `local-run-${Date.now()}`,
       status: 0,
       battleIndex: 0,
-      playerCurrentHp: difficulty === 'easy' ? 120 : 100,
-      playerMaxHp: difficulty === 'easy' ? 120 : 100,
+      playerCurrentHp: 100,
+      playerMaxHp: 100,
       itemIds,
-      difficulty,
     };
     this.localBattle = null;
     return this.localRun;
   }
 
-  async startRun(itemIds, difficulty = 'normal') {
+  async startRun(_itemIds) {
+    const equippedItemIds = await this.getEquippedItemIds();
+
+    if (!equippedItemIds.length) {
+      return { success: false, error: 'Equip at least one item before starting a run.' };
+    }
+
     try {
-      const response = await api.startRun({ itemIds, difficulty });
+      const response = await api.startRun({ itemIds: equippedItemIds });
       return { success: true, data: response };
     } catch (_error) {
-      return { success: true, data: this.createLocalRun(itemIds, difficulty) };
+      return { success: true, data: this.createLocalRun(equippedItemIds) };
     }
   }
 
@@ -453,7 +505,7 @@ class AuthService {
 
   createLocalBattle() {
     if (!this.localRun) return null;
-    const enemyCount = this.localRun.difficulty === 'easy' ? 1 : 2;
+    const enemyCount = 1;
     this.localRun.status = 1;
     this.localRun.battleIndex = (this.localRun.battleIndex || 0) + 1;
     this.localBattle = {
@@ -463,12 +515,16 @@ class AuthService {
       playerPosition: 1,
       leftHandItemId: this.localEquipmentSlots.weapon1?.id || null,
       rightHandItemId: this.localEquipmentSlots.weapon2?.id || this.localEquipmentSlots.weapon1?.id || null,
-      enemies: Array.from({ length: enemyCount }, (_, index) => ({
-        id: `enemy-${Date.now()}-${index}`,
-        position: index + 2,
-        currentHp: 35 + (index * 10),
-        maxHp: 35 + (index * 10),
-      })),
+      enemies: Array.from({ length: enemyCount }, (_, index) => {
+        const type = OPPONENT_TYPES[(this.localRun.battleIndex + index) % OPPONENT_TYPES.length];
+        return {
+          id: `enemy-${Date.now()}-${index}`,
+          name: type.name,
+          position: type.position,
+          currentHp: type.hp,
+          maxHp: type.hp,
+        };
+      }),
     };
     return this.localBattle;
   }
@@ -495,6 +551,17 @@ class AuthService {
     });
     this.rememberAdventureRewards([reward]);
     return reward;
+  }
+
+  removeLostEquippedItems() {
+    const lostIds = new Set(this.localRun?.itemIds || []);
+    this.adventureRewards = this.adventureRewards.filter((item) => !lostIds.has(item.id));
+
+    Object.keys(this.localEquipmentSlots).forEach((key) => {
+      if (lostIds.has(this.localEquipmentSlots[key]?.id)) {
+        delete this.localEquipmentSlots[key];
+      }
+    });
   }
 
   resolveLocalTurn(payload = {}) {
@@ -538,7 +605,7 @@ class AuthService {
       this.localRun.playerCurrentHp = this.localBattle.playerCurrentHp;
       this.localBattle = null;
     } else {
-      enemyDamage = this.localBattle.enemies.length * (this.localRun.difficulty === 'easy' ? 8 : 12);
+      enemyDamage = this.localBattle.enemies.length * 12;
       this.localBattle.playerCurrentHp = Math.max(0, this.localBattle.playerCurrentHp - enemyDamage);
       this.localRun.playerCurrentHp = this.localBattle.playerCurrentHp;
       log.push(`Opponents dealt ${enemyDamage} damage.`);
@@ -547,7 +614,8 @@ class AuthService {
     const playerDefeated = !!this.localBattle && this.localBattle.playerCurrentHp <= 0;
     if (playerDefeated) {
       this.localRun.status = 3;
-      message = 'You lost the run.';
+      this.removeLostEquippedItems();
+      message = 'You lost the run. Equipped items were lost.';
       this.localBattle = null;
     }
 
@@ -617,12 +685,15 @@ class AuthService {
 
   async getMarketListings(category = null, pageNumber = 1, pageSize = 20, sort = 'asc') {
     const local = this.localMarketListings
-      .filter((listing) => !listing.isSold && (!category || listing.category === category || listing.category === String(category)))
+      .filter((listing) => !listing.isSold && listingMatchesCategory(listing, category))
       .sort((a, b) => sort === 'desc' ? Number(b.price) - Number(a.price) : Number(a.price) - Number(b.price));
 
     try {
       const response = await api.getMarketListings(category, pageNumber, pageSize, sort);
-      return { success: true, data: [...(Array.isArray(response) ? response.map(normalizeListing) : []), ...local] };
+      const listings = uniqueListings([...local, ...flattenListingResponse(response)])
+        .filter((listing) => listingMatchesCategory(listing, category))
+        .sort((a, b) => sort === 'desc' ? Number(b.price) - Number(a.price) : Number(a.price) - Number(b.price));
+      return { success: true, data: listings };
     } catch (_error) {
       return { success: true, data: local };
     }
@@ -630,26 +701,24 @@ class AuthService {
 
   async createMarketListing(itemIdValue, price) {
     const numericPrice = Number(price);
+    const items = await this.getAllKnownItems();
+    const item = items.find((candidate) => candidate.id === itemIdValue);
+
     try {
       const response = await api.createMarketListing({ itemId: itemIdValue, price: numericPrice });
-      return { success: true, data: response };
-    } catch (_error) {
-      const items = await this.getAllKnownItems();
-      const item = items.find((candidate) => candidate.id === itemIdValue);
-      if (!item) {
-        return { success: false, error: 'Item not found in inventory' };
-      }
-
       const listing = normalizeListing({
-        id: `local-listing-${Date.now()}`,
-        itemId: item.id,
-        itemName: item.name,
-        price: numericPrice,
-        category: isWeapon(item) ? 'Weapon' : 'Armor',
+        ...(response || {}),
+        id: response?.id ?? response?.Id ?? `listed-${itemIdValue}`,
+        itemId: response?.itemId ?? response?.ItemId ?? itemIdValue,
+        itemName: response?.itemName ?? response?.ItemName ?? item?.name ?? 'Listed item',
+        price: response?.price ?? response?.Price ?? numericPrice,
+        category: response?.category ?? response?.Category ?? (isWeapon(item) ? 'Weapon' : 'Armor'),
         isSold: false,
       });
-      this.localMarketListings = [...this.localMarketListings, listing];
+      this.localMarketListings = uniqueListings([listing, ...this.localMarketListings]);
       return { success: true, data: listing };
+    } catch (error) {
+      return { success: false, error: error.message || 'Could not list item on the market' };
     }
   }
 

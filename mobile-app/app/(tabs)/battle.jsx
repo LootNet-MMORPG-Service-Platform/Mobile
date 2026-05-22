@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import authService from '../../services/authService';
@@ -18,11 +18,6 @@ const ACTION = {
   CHANGE_POSITION: 2,
   END_TURN: 3,
 };
-
-const DIFFICULTIES = [
-  { key: 'easy', label: 'Scout', description: 'A lighter path with one foe' },
-  { key: 'normal', label: 'Warband', description: 'Standard challenge' },
-];
 
 const read = (obj, a, b) => obj?.[a] ?? obj?.[b];
 const fmt = (v) => Number(v ?? 0).toFixed(1);
@@ -68,7 +63,6 @@ export default function BattleScreen() {
   const [battleRewards, setBattleRewards] = useState([]);
   const [battleMessage, setBattleMessage] = useState('');
   const [equipmentSlots, setEquipmentSlots] = useState({});
-  const [runDifficulty, setRunDifficulty] = useState('easy');
   const [helpOpen, setHelpOpen] = useState(false);
 
   const [handsEditorOpen, setHandsEditorOpen] = useState(false);
@@ -110,15 +104,14 @@ export default function BattleScreen() {
 
   const startRun = async () => {
     setLoading(true);
-    const runInv = await authService.getInventory('inventory');
-    if (!runInv.success) {
+    const equippedItems = await authService.getEquippedItems();
+    if (!equippedItems.success || !(equippedItems.data || []).length) {
       setLoading(false);
-      Alert.alert('Error', runInv.error || 'Failed to load inventory gear');
+      Alert.alert('Run', 'Equip at least one item before starting a run.');
       return;
     }
 
-    const itemIds = (runInv.data || []).map((x) => x.id || x.Id).filter(Boolean);
-    const result = await authService.startRun(itemIds, runDifficulty);
+    const result = await authService.startRun([]);
     setLoading(false);
     if (!result.success) {
       Alert.alert('Error', result.error || 'Failed to start run');
@@ -324,39 +317,23 @@ export default function BattleScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTopRow}>
-          <View style={{ width: 34 }} />
-          <Text style={styles.title}>Run</Text>
-          <TouchableOpacity style={styles.helpButton} onPress={() => setHelpOpen(true)}>
-            <Text style={styles.helpButtonText}>?</Text>
-          </TouchableOpacity>
+    <>
+      <ScrollView style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.headerTopRow}>
+            <View style={{ width: 34 }} />
+            <Text style={styles.title}>Run</Text>
+            <TouchableOpacity style={styles.helpButton} onPress={() => setHelpOpen(true)}>
+              <Text style={styles.helpButtonText}>?</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.subtitle}>Choose a route, fight, and bring loot home.</Text>
         </View>
-        <Text style={styles.subtitle}>Choose a route, fight, and bring loot home.</Text>
-      </View>
 
-      {!run ? (
+        {!run ? (
         <View style={styles.panel}>
           <Text style={styles.panelTitle}>No active run</Text>
           <Text style={styles.panelText}>Start an adventure with the gear you prepared.</Text>
-          <Text style={styles.sectionTitle}>Difficulty</Text>
-          <View style={styles.difficultyRow}>
-            {DIFFICULTIES.map((difficulty) => (
-              <TouchableOpacity
-                key={difficulty.key}
-                style={[styles.difficultyBtn, runDifficulty === difficulty.key && styles.difficultyBtnActive]}
-                onPress={() => setRunDifficulty(difficulty.key)}
-              >
-                <Text style={[styles.difficultyTitle, runDifficulty === difficulty.key && styles.difficultyTitleActive]}>
-                  {difficulty.label}
-                </Text>
-                <Text style={[styles.difficultyDesc, runDifficulty === difficulty.key && styles.difficultyDescActive]}>
-                  {difficulty.description}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
           <TouchableOpacity style={styles.actionBtn} onPress={startRun} disabled={loading}>
             <IconSymbol name="play.fill" size={16} color="#F4E4C1" />
             <Text style={styles.actionText}>{loading ? 'Starting...' : 'Start Run'}</Text>
@@ -375,7 +352,7 @@ export default function BattleScreen() {
           {(battle.enemies || []).length === 0 && <Text style={styles.panelText}>No enemies in current battle.</Text>}
           {(battle.enemies || []).map((e, idx) => (
             <View key={e.id} style={styles.enemyRow}>
-              <Text style={styles.enemyText}>Opponent {idx + 1}</Text>
+              <Text style={styles.enemyText}>{e.name || e.Name || `Opponent ${idx + 1}`}</Text>
               <Text style={styles.enemyText}>Distance {e.position}</Text>
               <Text style={styles.enemyText}>HP {e.currentHp}/{e.maxHp}</Text>
               <TouchableOpacity
@@ -498,20 +475,20 @@ export default function BattleScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      )}
+        )}
+      </ScrollView>
 
-      {helpOpen && (
-        <TouchableOpacity style={styles.modalBg} onPress={() => setHelpOpen(false)}>
+      <Modal transparent visible={helpOpen} animationType="fade" onRequestClose={() => setHelpOpen(false)}>
+        <TouchableOpacity style={styles.modalBg} activeOpacity={1} onPress={() => setHelpOpen(false)}>
           <View style={styles.helpCard}>
             <Text style={styles.helpTitle}>How Battles Work</Text>
             <Text style={styles.helpLine}>Attack, move, change hands, or end turn to resolve enemy counterattacks.</Text>
             <Text style={styles.helpLine}>Distance shows how far each opponent is on the battle line. Move front or back to change your position.</Text>
             <Text style={styles.helpLine}>Change battle hands when you need a different weapon setup. One-handed weapons use one hand; two-handed weapons use both.</Text>
-            <Text style={styles.helpLine}>Scout is the lighter route with one foe. Warband is the standard challenge.</Text>
           </View>
         </TouchableOpacity>
-      )}
-    </ScrollView>
+      </Modal>
+    </>
   );
 }
 
@@ -528,13 +505,6 @@ const styles = StyleSheet.create({
   panelText: { color: '#A0826D', marginBottom: 6, fontFamily: 'Lato_400Regular' },
   sectionTitle: { color: '#D6A84F', fontWeight: '700', marginTop: 10, marginBottom: 8, fontFamily: 'Lato_700Bold' },
   sectionHint: { color: '#A0826D', fontSize: 12, marginBottom: 8, fontFamily: 'Lato_400Regular' },
-  difficultyRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  difficultyBtn: { flex: 1, backgroundColor: '#2C1810', borderWidth: 1, borderColor: '#8B7355', borderRadius: 8, padding: 10 },
-  difficultyBtnActive: { backgroundColor: '#D6A84F', borderColor: '#F4E4C1' },
-  difficultyTitle: { color: '#F4E4C1', fontSize: 13, fontWeight: '700', fontFamily: 'Lato_700Bold' },
-  difficultyTitleActive: { color: '#2C1810' },
-  difficultyDesc: { color: '#A0826D', fontSize: 11, marginTop: 4, fontFamily: 'Lato_400Regular' },
-  difficultyDescActive: { color: '#3E2723' },
   enemyRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#2C1810', borderWidth: 1, borderColor: '#8B7355', borderRadius: 8, padding: 8, marginBottom: 6 },
   enemyText: { color: '#F4E4C1', fontSize: 12, fontFamily: 'Lato_400Regular' },
   enemyAttackBtn: { backgroundColor: '#8B7355', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
@@ -563,8 +533,8 @@ const styles = StyleSheet.create({
   miniActionBtn: { backgroundColor: '#8B7355', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5 },
   miniActionBtnWide: { backgroundColor: '#8B7355', borderRadius: 6, paddingHorizontal: 14, paddingVertical: 5 },
   miniActionTxt: { color: '#F4E4C1', fontSize: 11, fontWeight: '700', fontFamily: 'Lato_700Bold' },
-  modalBg: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 20 },
-  helpCard: { backgroundColor: '#2C1810', borderWidth: 1, borderColor: '#8B7355', borderRadius: 10, padding: 16 },
+  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  helpCard: { width: '100%', maxWidth: 420, backgroundColor: '#2C1810', borderWidth: 1, borderColor: '#8B7355', borderRadius: 10, padding: 16 },
   helpTitle: { color: '#F4E4C1', fontSize: 19, fontWeight: '700', marginBottom: 10, fontFamily: 'Lato_700Bold' },
   helpLine: { color: '#A0826D', fontSize: 14, lineHeight: 20, marginBottom: 8, fontFamily: 'Lato_400Regular' },
 });

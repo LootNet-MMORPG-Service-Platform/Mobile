@@ -7,8 +7,8 @@ const tips = [
     body: 'Move items into Adventure Gear before starting a run. Items listed on the market stay out of your adventure choices.',
   },
   {
-    title: 'Choose Difficulty',
-    body: 'Scout is the lighter route. Warband is the standard fight for better pressure and bigger risk.',
+    title: 'Start Adventure',
+    body: 'Equip gear and go on an adventure.',
   },
   {
     title: 'Fight Smart',

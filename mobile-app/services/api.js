@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 
 const DEFAULT_API_BASE_URL = 'https://lootnet-api.onrender.com/api';
 const REQUEST_TIMEOUT_MS = 30000;
+const AUTH_REQUEST_TIMEOUT_MS = 120000;
 const GENERIC_ERROR_MESSAGE = 'Request failed. Please try again.';
 const IS_DEV = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
 
@@ -154,9 +155,9 @@ class ApiService {
     }
   }
 
-  async fetchWithTimeout(url, config) {
+  async fetchWithTimeout(url, config, timeoutMs = REQUEST_TIMEOUT_MS) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       return await fetch(url, {
@@ -202,13 +203,14 @@ class ApiService {
 
   async request(endpoint, options = {}, retryOnUnauthorized = true) {
     const url = `${this.baseURL}${endpoint}`;
+    const { timeoutMs = REQUEST_TIMEOUT_MS, ...requestOptions } = options;
     const config = {
       headers: this.getHeaders(),
-      ...options,
+      ...requestOptions,
     };
 
     try {
-      const response = await this.fetchWithTimeout(url, config);
+      const response = await this.fetchWithTimeout(url, config, timeoutMs);
       const data = await this.parseResponse(response);
 
       if (response.status === 401 && retryOnUnauthorized && this.refreshTokenValue) {
@@ -280,6 +282,7 @@ class ApiService {
   async register(userData) {
     return this.request('/auth/register', {
       method: 'POST',
+      timeoutMs: AUTH_REQUEST_TIMEOUT_MS,
       body: JSON.stringify(userData),
     });
   }

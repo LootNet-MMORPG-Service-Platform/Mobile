@@ -143,6 +143,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
+    fontFamily: 'UnifrakturMaguntia_400Regular',
     fontWeight: 'bold',
     color: '#F4E4C1',
     marginTop: 10,
