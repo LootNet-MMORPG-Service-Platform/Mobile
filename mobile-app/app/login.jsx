@@ -8,6 +8,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { usePreventScreenCapture } from 'expo-screen-capture';
@@ -37,7 +38,7 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       const result = await login(cleanEmail, password);
-      
+
       if (result.success) {
         Alert.alert('Success', 'Welcome back!');
         router.replace('/(tabs)');
@@ -52,7 +53,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
@@ -65,7 +66,7 @@ export default function LoginScreen() {
 
         <View style={styles.form}>
           <View style={styles.inputContainer}>
-          <IconSymbol name="email" size={20} color="#D7C0A5" />
+            <IconSymbol name="email" size={20} color="#D7C0A5" />
             <TextInput
               style={styles.input}
               placeholder="Email"
@@ -99,10 +100,10 @@ export default function LoginScreen() {
               style={styles.eyeIcon}
               onPress={() => setShowPassword(!showPassword)}
             >
-              <IconSymbol 
-                name={showPassword ? "eye.slash" : "eye"} 
-                size={20} 
-                color="#D7C0A5" 
+              <IconSymbol
+                name={showPassword ? 'eye.slash' : 'eye'}
+                size={20}
+                color="#D7C0A5"
               />
             </TouchableOpacity>
           </View>

@@ -13,7 +13,15 @@ import { useRouter } from 'expo-router';
 import { usePreventScreenCapture } from 'expo-screen-capture';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '../contexts/AuthContext';
-import { isSafeAuthError, sanitizeEmail, sanitizeUsername, validateEmail, validatePassword, validatePasswordConfirmation, validateUsername } from '../utils/security';
+import {
+  isSafeAuthError,
+  sanitizeEmail,
+  sanitizeUsername,
+  validateEmail,
+  validatePassword,
+  validatePasswordConfirmation,
+  validateUsername,
+} from '../utils/security';
 
 export default function RegisterScreen() {
   const [username, setUsername] = useState('');
@@ -43,9 +51,9 @@ export default function RegisterScreen() {
       const result = await register({
         username: cleanUsername,
         email: cleanEmail,
-        password: password,
+        password,
       });
-      
+
       if (result.success) {
         Alert.alert('Success', 'Account created. Check your email before logging in.');
         router.replace('/login');
@@ -60,7 +68,7 @@ export default function RegisterScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
@@ -73,7 +81,7 @@ export default function RegisterScreen() {
 
         <View style={styles.form}>
           <View style={styles.inputContainer}>
-          <IconSymbol name="person" size={20} color="#D7C0A5" />
+            <IconSymbol name="person" size={20} color="#D7C0A5" />
             <TextInput
               style={styles.input}
               placeholder="Username"

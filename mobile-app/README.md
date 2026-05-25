@@ -50,7 +50,13 @@ Linting is enabled in `eslint.config.js` and exposed through the `lint` script i
 npm run lint
 ```
 
-Run this before handing in changes.
+To let ESLint apply automatic fixes where possible, run:
+
+```cmd
+npm run lint:fix
+```
+
+Run `npm run lint` before handing in changes.
 
 ## Start The Backend
 
