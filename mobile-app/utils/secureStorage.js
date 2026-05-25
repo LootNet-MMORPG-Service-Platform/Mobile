@@ -19,7 +19,10 @@ const canUseWebStorage = () =>
 
 const logSecureStorageWarning = (operation, error) => {
   if (__DEV__) {
-    console.warn(`Secure storage ${operation} failed`, error?.message || 'Unexpected storage error');
+    console.warn(
+      `Secure storage ${operation} failed`,
+      error?.message || 'Unexpected storage error',
+    );
   }
 };
 
@@ -64,7 +67,9 @@ class SecureStorage {
 
     try {
       if (await SecureStorage.canUseNativeSecureStore()) {
-        return fromStorageValue(await ExpoSecureStore.getItemAsync(resolvedKey, SECURE_STORE_OPTIONS));
+        return fromStorageValue(
+          await ExpoSecureStore.getItemAsync(resolvedKey, SECURE_STORE_OPTIONS),
+        );
       }
 
       if (canUseWebStorage()) {

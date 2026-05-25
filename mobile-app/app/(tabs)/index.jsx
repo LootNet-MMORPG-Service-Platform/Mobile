@@ -21,16 +21,19 @@ export default function HomeScreen() {
       setProfile(profileResult.data);
     }
 
-    const uniqueItemIds = new Set([
-      ...(mainInv.success ? (mainInv.data || []) : []),
-      ...(runInv.success ? (runInv.data || []) : []),
-    ].map((item) => item?.id ?? item?.Id).filter(Boolean));
+    const uniqueItemIds = new Set(
+      [...(mainInv.success ? mainInv.data || [] : []), ...(runInv.success ? runInv.data || [] : [])]
+        .map((item) => item?.id ?? item?.Id)
+        .filter(Boolean),
+    );
     setItemCount(uniqueItemIds.size);
   }, []);
 
-  useFocusEffect(useCallback(() => {
-    loadDashboard();
-  }, [loadDashboard]));
+  useFocusEffect(
+    useCallback(() => {
+      loadDashboard();
+    }, [loadDashboard]),
+  );
 
   return (
     <ScrollView style={styles.container}>
@@ -56,7 +59,10 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/(tabs)/equipment')}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push('/(tabs)/equipment')}
+        >
           <IconSymbol name="shield" size={24} color="#F4E4C1" />
           <View style={styles.actionText}>
             <Text style={styles.actionTitle}>Equipment</Text>
@@ -65,7 +71,10 @@ export default function HomeScreen() {
           <IconSymbol name="chevron.right" size={22} color="#A0826D" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/(tabs)/rewards')}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push('/(tabs)/rewards')}
+        >
           <IconSymbol name="gift" size={24} color="#F4E4C1" />
           <View style={styles.actionText}>
             <Text style={styles.actionTitle}>Daily Reward</Text>

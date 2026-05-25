@@ -32,7 +32,11 @@ const isUsableJwt = (token) => {
 };
 const itemId = (item) => item?.id ?? item?.Id;
 const itemName = (item) => item?.name ?? item?.Name;
-const isWeapon = (item) => item?.weaponType !== undefined || item?.WeaponType !== undefined || item?.cut !== undefined || item?.Cut !== undefined;
+const isWeapon = (item) =>
+  item?.weaponType !== undefined ||
+  item?.WeaponType !== undefined ||
+  item?.cut !== undefined ||
+  item?.Cut !== undefined;
 
 const normalizeItem = (item) => {
   if (!item) return item;
@@ -170,13 +174,16 @@ class AuthService {
       clearInterval(this.tokenRefreshInterval);
     }
 
-    this.tokenRefreshInterval = setInterval(async () => {
-      try {
-        await api.refreshAccessToken();
-      } catch (_error) {
-        logAuthWarning('Token refresh failed');
-      }
-    }, 5 * 60 * 1000);
+    this.tokenRefreshInterval = setInterval(
+      async () => {
+        try {
+          await api.refreshAccessToken();
+        } catch (_error) {
+          logAuthWarning('Token refresh failed');
+        }
+      },
+      5 * 60 * 1000,
+    );
   }
 
   stopTokenRefreshMonitoring() {
@@ -287,7 +294,10 @@ class AuthService {
   async getEquipment() {
     try {
       const response = await api.getEquipment();
-      return { success: true, data: uniqueItems([...flattenItemResponse(response), ...this.adventureRewards]) };
+      return {
+        success: true,
+        data: uniqueItems([...flattenItemResponse(response), ...this.adventureRewards]),
+      };
     } catch (error) {
       logAuthWarning('Equipment load failed', error);
       return { success: true, data: uniqueItems(this.adventureRewards) };
@@ -297,7 +307,10 @@ class AuthService {
   async getInventory(scope = 'inventory') {
     try {
       const response = await api.getInventory(scope);
-      const apiItems = uniqueItems([...flattenItemResponse(response), ...(scope === 'inventory' ? this.adventureRewards : [])]);
+      const apiItems = uniqueItems([
+        ...flattenItemResponse(response),
+        ...(scope === 'inventory' ? this.adventureRewards : []),
+      ]);
 
       if (scope === 'run') {
         const runIds = new Set(this.localRun?.itemIds || []);
@@ -345,13 +358,14 @@ class AuthService {
     if (isWeapon(normalized)) {
       this.localEquipmentSlots[`weapon${slot}`] = normalized;
     } else {
-      const armorSlot = normalized.armorType === 0 || normalized.armorType === 'Helmet'
-        ? 'head'
-        : normalized.armorType === 2 || normalized.armorType === 'Gloves'
-          ? 'gloves'
-          : normalized.armorType === 3 || normalized.armorType === 'Boots'
-            ? 'boots'
-            : 'body';
+      const armorSlot =
+        normalized.armorType === 0 || normalized.armorType === 'Helmet'
+          ? 'head'
+          : normalized.armorType === 2 || normalized.armorType === 'Gloves'
+            ? 'gloves'
+            : normalized.armorType === 3 || normalized.armorType === 'Boots'
+              ? 'boots'
+              : 'body';
       this.localEquipmentSlots[armorSlot] = normalized;
     }
   }
@@ -374,7 +388,11 @@ class AuthService {
 
   async equipWeaponToSlot(itemIdValue, slot) {
     const items = await this.getAllKnownItems();
-    const item = items.find((x) => x.id === itemIdValue) || { id: itemIdValue, name: 'Weapon', weaponType: 0 };
+    const item = items.find((x) => x.id === itemIdValue) || {
+      id: itemIdValue,
+      name: 'Weapon',
+      weaponType: 0,
+    };
     try {
       await api.equipWeapon(slot, itemIdValue);
       this.rememberEquippedItem(item, slot);
@@ -457,7 +475,8 @@ class AuthService {
       playerMaxHp: this.localRun.playerMaxHp,
       playerPosition: 1,
       leftHandItemId: this.localEquipmentSlots.weapon1?.id || null,
-      rightHandItemId: this.localEquipmentSlots.weapon2?.id || this.localEquipmentSlots.weapon1?.id || null,
+      rightHandItemId:
+        this.localEquipmentSlots.weapon2?.id || this.localEquipmentSlots.weapon1?.id || null,
       enemies: Array.from({ length: enemyCount }, (_, index) => {
         const type = OPPONENT_TYPES[(this.localRun.battleIndex + index) % OPPONENT_TYPES.length];
         return {
@@ -478,7 +497,9 @@ class AuthService {
       return { success: true, data: response };
     } catch (_error) {
       const battle = this.createLocalBattle();
-      return battle ? { success: true, data: battle } : { success: false, error: 'Start a run first' };
+      return battle
+        ? { success: true, data: battle }
+        : { success: false, error: 'Start a run first' };
     }
   }
 
@@ -521,7 +542,9 @@ class AuthService {
     let message = '';
 
     if (type === 0) {
-      const target = this.localBattle.enemies.find((enemy) => enemy.position === action.targetPosition) || this.localBattle.enemies[0];
+      const target =
+        this.localBattle.enemies.find((enemy) => enemy.position === action.targetPosition) ||
+        this.localBattle.enemies[0];
       if (target) {
         damageDealt = 24;
         target.currentHp = Math.max(0, target.currentHp - damageDealt);
@@ -549,7 +572,10 @@ class AuthService {
       this.localBattle = null;
     } else {
       enemyDamage = this.localBattle.enemies.length * 12;
-      this.localBattle.playerCurrentHp = Math.max(0, this.localBattle.playerCurrentHp - enemyDamage);
+      this.localBattle.playerCurrentHp = Math.max(
+        0,
+        this.localBattle.playerCurrentHp - enemyDamage,
+      );
       this.localRun.playerCurrentHp = this.localBattle.playerCurrentHp;
       log.push(`Opponents dealt ${enemyDamage} damage.`);
     }
@@ -615,7 +641,6 @@ class AuthService {
       return { success: false, error: error.message };
     }
   }
-
 }
 
 export default new AuthService();

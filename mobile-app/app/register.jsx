@@ -58,7 +58,10 @@ export default function RegisterScreen() {
         Alert.alert('Success', 'Account created. Check your email before logging in.');
         router.replace('/login');
       } else {
-        Alert.alert('Registration Failed', isSafeAuthError(result.error) ? result.error : 'Unable to create account.');
+        Alert.alert(
+          'Registration Failed',
+          isSafeAuthError(result.error) ? result.error : 'Unable to create account.',
+        );
       }
     } catch (_error) {
       Alert.alert('Error', 'An unexpected error occurred');

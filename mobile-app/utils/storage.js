@@ -12,7 +12,10 @@ const isSensitiveKey = (key) => SENSITIVE_KEYS.has(key);
 
 const logStorageWarning = (operation, key, error) => {
   if (__DEV__) {
-    console.warn(`Storage ${operation} fallback for ${key}`, error?.message || 'Unexpected storage error');
+    console.warn(
+      `Storage ${operation} fallback for ${key}`,
+      error?.message || 'Unexpected storage error',
+    );
   }
 };
 

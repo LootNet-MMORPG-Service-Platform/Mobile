@@ -66,8 +66,7 @@ export const validatePasswordConfirmation = (password, confirmation) => {
   return null;
 };
 
-export const isSafeAuthError = (message) => (
+export const isSafeAuthError = (message) =>
   typeof message === 'string' &&
   message.length <= 220 &&
-  !/Bearer\s+|https?:\/\/|authToken|refreshToken/i.test(message)
-);
+  !/Bearer\s+|https?:\/\/|authToken|refreshToken/i.test(message);

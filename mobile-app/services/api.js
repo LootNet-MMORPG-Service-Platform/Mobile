@@ -13,12 +13,11 @@ const normalizeApiBaseUrl = (rawUrl) => {
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
 };
 
-const isLocalHttpUrl = (url) => (
+const isLocalHttpUrl = (url) =>
   /^http:\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2|\[::1\])/i.test(url) ||
   /^http:\/\/192\.168\./i.test(url) ||
   /^http:\/\/10\./i.test(url) ||
-  /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\./i.test(url)
-);
+  /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\./i.test(url);
 
 const validateApiBaseUrl = (url) => {
   if (!url) return url;
@@ -72,9 +71,7 @@ const sanitizeApiMessage = (data, status) => {
   if (status === 403) return 'You do not have permission to perform this action.';
   if (status === 404) return 'Requested resource was not found.';
 
-  const serverMessage = typeof data === 'string'
-    ? data
-    : data?.message || data?.title;
+  const serverMessage = typeof data === 'string' ? data : data?.message || data?.title;
 
   if (!serverMessage) {
     return `${GENERIC_ERROR_MESSAGE} (${status})`;
@@ -232,7 +229,11 @@ class ApiService {
       return data;
     } catch (error) {
       logApiWarning('API request failed', error);
-      throw new Error(error?.name === 'AbortError' ? 'Request timed out. Please try again.' : error.message || GENERIC_ERROR_MESSAGE);
+      throw new Error(
+        error?.name === 'AbortError'
+          ? 'Request timed out. Please try again.'
+          : error.message || GENERIC_ERROR_MESSAGE,
+      );
     }
   }
 
@@ -253,7 +254,10 @@ class ApiService {
         const refreshResult = await this.refreshAccessToken();
 
         if (refreshResult?.token) {
-          return this.requestForm(endpoint, formData, { ...options, headers: this.getMultipartHeaders() });
+          return this.requestForm(endpoint, formData, {
+            ...options,
+            headers: this.getMultipartHeaders(),
+          });
         }
       }
 
@@ -264,7 +268,11 @@ class ApiService {
       return data;
     } catch (error) {
       logApiWarning('API form request failed', error);
-      throw new Error(error?.name === 'AbortError' ? 'Request timed out. Please try again.' : error.message || GENERIC_ERROR_MESSAGE);
+      throw new Error(
+        error?.name === 'AbortError'
+          ? 'Request timed out. Please try again.'
+          : error.message || GENERIC_ERROR_MESSAGE,
+      );
     }
   }
 
@@ -302,10 +310,14 @@ class ApiService {
   }
 
   async refreshToken(refreshToken) {
-    return this.request('/auth/refresh', {
-      method: 'POST',
-      body: JSON.stringify(refreshToken),
-    }, false);
+    return this.request(
+      '/auth/refresh',
+      {
+        method: 'POST',
+        body: JSON.stringify(refreshToken),
+      },
+      false,
+    );
   }
 
   async getUserProfile() {
@@ -400,7 +412,6 @@ class ApiService {
       method: 'POST',
     });
   }
-
 }
 
 export default new ApiService();

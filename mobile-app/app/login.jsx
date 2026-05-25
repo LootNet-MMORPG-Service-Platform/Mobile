@@ -48,7 +48,10 @@ export default function LoginScreen() {
         Alert.alert('Success', 'Welcome back!');
         router.replace('/(tabs)');
       } else {
-        Alert.alert('Login Failed', isSafeAuthError(result.error) ? result.error : 'Unable to sign in.');
+        Alert.alert(
+          'Login Failed',
+          isSafeAuthError(result.error) ? result.error : 'Unable to sign in.',
+        );
       }
     } catch (_error) {
       Alert.alert('Error', 'An unexpected error occurred');
@@ -101,15 +104,8 @@ export default function LoginScreen() {
               maxLength={128}
               onSubmitEditing={handleLogin}
             />
-            <TouchableOpacity
-              style={styles.eyeIcon}
-              onPress={() => setShowPassword(!showPassword)}
-            >
-              <IconSymbol
-                name={showPassword ? 'eye.slash' : 'eye'}
-                size={20}
-                color="#D7C0A5"
-              />
+            <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
+              <IconSymbol name={showPassword ? 'eye.slash' : 'eye'} size={20} color="#D7C0A5" />
             </TouchableOpacity>
           </View>
 
@@ -118,9 +114,7 @@ export default function LoginScreen() {
             onPress={handleLogin}
             disabled={isLoading}
           >
-            <Text style={styles.loginButtonText}>
-              {isLoading ? 'Logging in...' : 'Login'}
-            </Text>
+            <Text style={styles.loginButtonText}>{isLoading ? 'Logging in...' : 'Login'}</Text>
           </TouchableOpacity>
         </View>
 

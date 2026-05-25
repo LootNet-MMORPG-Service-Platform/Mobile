@@ -1,11 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
+import {
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  Alert,
+} from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import authService from '../../services/authService';
 
 const getNextUtcMidnight = () => {
   const now = new Date();
-  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
+  const next = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0),
+  );
   return next.getTime();
 };
 
@@ -56,7 +66,9 @@ export default function RewardsScreen() {
   return (
     <ScrollView
       style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F4E4C1" />}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F4E4C1" />
+      }
     >
       <View style={styles.header}>
         <IconSymbol name="gift" size={42} color="#D6A84F" />
@@ -70,7 +82,9 @@ export default function RewardsScreen() {
         </View>
         <Text style={styles.rewardName}>{lastReward?.name || 'Mystery Loot'}</Text>
         <Text style={styles.rewardDescription}>
-          {alreadyClaimed ? `Next reward in ${timeLeft}` : 'Reward goes directly to your inventory.'}
+          {alreadyClaimed
+            ? `Next reward in ${timeLeft}`
+            : 'Reward goes directly to your inventory.'}
         </Text>
       </View>
 
@@ -81,7 +95,11 @@ export default function RewardsScreen() {
       >
         <IconSymbol name="gift" size={20} color="#F4E4C1" />
         <Text style={styles.claimButtonText}>
-          {isLoading ? 'Claiming...' : alreadyClaimed ? `Available in ${timeLeft}` : 'Claim Daily Reward'}
+          {isLoading
+            ? 'Claiming...'
+            : alreadyClaimed
+              ? `Available in ${timeLeft}`
+              : 'Claim Daily Reward'}
         </Text>
       </TouchableOpacity>
     </ScrollView>
@@ -90,14 +108,77 @@ export default function RewardsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#2C1810' },
-  header: { alignItems: 'center', padding: 24, backgroundColor: '#1A0E08', borderBottomWidth: 2, borderBottomColor: '#8B7355' },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#F4E4C1', marginTop: 10, textTransform: 'uppercase', fontFamily: 'Lato_700Bold' },
-  subtitle: { fontSize: 15, color: '#A0826D', textAlign: 'center', marginTop: 6, fontFamily: 'Lato_400Regular' },
-  rewardPanel: { margin: 20, padding: 24, alignItems: 'center', backgroundColor: '#3E2723', borderRadius: 8, borderWidth: 1, borderColor: '#8B7355' },
-  rewardIcon: { width: 96, height: 96, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D6A84F', marginBottom: 18 },
-  rewardName: { fontSize: 22, fontWeight: 'bold', color: '#F4E4C1', textAlign: 'center', fontFamily: 'Lato_700Bold' },
-  rewardDescription: { color: '#A0826D', fontSize: 15, textAlign: 'center', marginTop: 8, fontFamily: 'Lato_400Regular' },
-  claimButton: { marginHorizontal: 20, minHeight: 54, borderRadius: 8, backgroundColor: '#8B7355', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, paddingHorizontal: 12 },
+  header: {
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#1A0E08',
+    borderBottomWidth: 2,
+    borderBottomColor: '#8B7355',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#F4E4C1',
+    marginTop: 10,
+    textTransform: 'uppercase',
+    fontFamily: 'Lato_700Bold',
+  },
+  subtitle: {
+    fontSize: 15,
+    color: '#A0826D',
+    textAlign: 'center',
+    marginTop: 6,
+    fontFamily: 'Lato_400Regular',
+  },
+  rewardPanel: {
+    margin: 20,
+    padding: 24,
+    alignItems: 'center',
+    backgroundColor: '#3E2723',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#8B7355',
+  },
+  rewardIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#D6A84F',
+    marginBottom: 18,
+  },
+  rewardName: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#F4E4C1',
+    textAlign: 'center',
+    fontFamily: 'Lato_700Bold',
+  },
+  rewardDescription: {
+    color: '#A0826D',
+    fontSize: 15,
+    textAlign: 'center',
+    marginTop: 8,
+    fontFamily: 'Lato_400Regular',
+  },
+  claimButton: {
+    marginHorizontal: 20,
+    minHeight: 54,
+    borderRadius: 8,
+    backgroundColor: '#8B7355',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+  },
   claimButtonDisabled: { backgroundColor: '#4C3A32' },
-  claimButtonText: { color: '#F4E4C1', fontSize: 14, fontWeight: 'bold', textTransform: 'uppercase', fontFamily: 'Lato_700Bold' },
+  claimButtonText: {
+    color: '#F4E4C1',
+    fontSize: 14,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    fontFamily: 'Lato_700Bold',
+  },
 });

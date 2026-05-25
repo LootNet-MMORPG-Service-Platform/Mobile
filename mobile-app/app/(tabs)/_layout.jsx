@@ -11,7 +11,14 @@ export default function TabLayout() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2C1810' }}>
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#2C1810',
+        }}
+      >
         <ActivityIndicator color="#F4E4C1" />
       </View>
     );
@@ -29,7 +36,8 @@ export default function TabLayout() {
         tabBarStyle: { backgroundColor: '#1A0E08', borderTopColor: '#8B7355' },
         headerShown: false,
         tabBarButton: HapticTab,
-      }}>
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{

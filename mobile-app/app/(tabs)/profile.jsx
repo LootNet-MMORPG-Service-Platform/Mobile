@@ -71,16 +71,20 @@ export default function ProfileScreen() {
 
       const asset = pick.assets[0];
       const lowerUri = (asset.uri || '').toLowerCase();
-      const resolvedMime = asset.mimeType
-        || (lowerUri.endsWith('.png') ? 'image/png'
-          : lowerUri.endsWith('.webp') ? 'image/webp'
+      const resolvedMime =
+        asset.mimeType ||
+        (lowerUri.endsWith('.png')
+          ? 'image/png'
+          : lowerUri.endsWith('.webp')
+            ? 'image/webp'
             : 'image/jpeg');
-      const resolvedFileName = asset.fileName
-        || `profile.${resolvedMime === 'image/png' ? 'png' : resolvedMime === 'image/webp' ? 'webp' : 'jpg'}`;
+      const resolvedFileName =
+        asset.fileName ||
+        `profile.${resolvedMime === 'image/png' ? 'png' : resolvedMime === 'image/webp' ? 'webp' : 'jpg'}`;
       const upload = await authService.uploadProfilePicture(
         asset.uri,
         resolvedFileName,
-        resolvedMime
+        resolvedMime,
       );
 
       if (!upload.success) {
@@ -118,17 +122,18 @@ export default function ProfileScreen() {
           <IconSymbol name="lock" size={18} color="#D6A84F" />
           <Text style={styles.rowText}>Reset Password</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.row}
-          onPress={handleChangeProfilePicture}
-        >
+        <TouchableOpacity style={styles.row} onPress={handleChangeProfilePicture}>
           <IconSymbol name="camera" size={18} color="#D6A84F" />
           <Text style={styles.rowText}>Change Profile Picture</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.logoutWrap}>
-        <TouchableOpacity style={[styles.logoutBtn, isLoading && styles.logoutDisabled]} disabled={isLoading} onPress={handleLogout}>
+        <TouchableOpacity
+          style={[styles.logoutBtn, isLoading && styles.logoutDisabled]}
+          disabled={isLoading}
+          onPress={handleLogout}
+        >
           <Text style={styles.logoutText}>{isLoading ? 'Logging out...' : 'Logout'}</Text>
         </TouchableOpacity>
       </View>
@@ -138,18 +143,65 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#2C1810' },
-  header: { alignItems: 'center', padding: 24, backgroundColor: '#1A0E08', borderBottomWidth: 2, borderBottomColor: '#8B7355' },
-  avatar: { width: 86, height: 86, borderRadius: 43, borderWidth: 2, borderColor: '#8B7355', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', backgroundColor: '#3E2723' },
+  header: {
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#1A0E08',
+    borderBottomWidth: 2,
+    borderBottomColor: '#8B7355',
+  },
+  avatar: {
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+    borderWidth: 2,
+    borderColor: '#8B7355',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    backgroundColor: '#3E2723',
+  },
   avatarImage: { width: '100%', height: '100%' },
-  username: { marginTop: 12, fontSize: 24, fontWeight: 'bold', color: '#F4E4C1', fontFamily: 'Lato_700Bold' },
+  username: {
+    marginTop: 12,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#F4E4C1',
+    fontFamily: 'Lato_700Bold',
+  },
   role: { marginTop: 6, fontSize: 13, color: '#D6A84F', fontFamily: 'Lato_700Bold' },
   currency: { marginTop: 8, color: '#A0826D', fontFamily: 'Lato_400Regular' },
-  section: { margin: 16, backgroundColor: '#3E2723', borderRadius: 10, borderWidth: 1, borderColor: '#8B7355' },
-  sectionTitle: { color: '#F4E4C1', fontSize: 16, fontWeight: '700', padding: 14, borderBottomWidth: 1, borderBottomColor: '#8B7355', fontFamily: 'Lato_700Bold' },
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14, gap: 10 },
+  section: {
+    margin: 16,
+    backgroundColor: '#3E2723',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#8B7355',
+  },
+  sectionTitle: {
+    color: '#F4E4C1',
+    fontSize: 16,
+    fontWeight: '700',
+    padding: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#8B7355',
+    fontFamily: 'Lato_700Bold',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    gap: 10,
+  },
   rowText: { color: '#F4E4C1', fontFamily: 'Lato_400Regular' },
   logoutWrap: { margin: 16 },
-  logoutBtn: { backgroundColor: '#8B7355', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
+  logoutBtn: {
+    backgroundColor: '#8B7355',
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
   logoutDisabled: { backgroundColor: '#654321' },
   logoutText: { color: '#F4E4C1', fontWeight: '700', fontFamily: 'Lato_700Bold' },
 });

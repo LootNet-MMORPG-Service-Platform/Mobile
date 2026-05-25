@@ -43,11 +43,42 @@ export default function ExploreScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#2C1810' },
-  header: { alignItems: 'center', padding: 24, backgroundColor: '#1A0E08', borderBottomWidth: 2, borderBottomColor: '#8B7355' },
-  title: { color: '#F4E4C1', fontSize: 28, fontWeight: '700', textTransform: 'uppercase', marginTop: 10, fontFamily: 'Lato_700Bold' },
-  subtitle: { color: '#A0826D', fontSize: 15, marginTop: 6, textAlign: 'center', fontFamily: 'Lato_400Regular' },
+  header: {
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#1A0E08',
+    borderBottomWidth: 2,
+    borderBottomColor: '#8B7355',
+  },
+  title: {
+    color: '#F4E4C1',
+    fontSize: 28,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    marginTop: 10,
+    fontFamily: 'Lato_700Bold',
+  },
+  subtitle: {
+    color: '#A0826D',
+    fontSize: 15,
+    marginTop: 6,
+    textAlign: 'center',
+    fontFamily: 'Lato_400Regular',
+  },
   content: { padding: 16, gap: 12 },
-  tip: { backgroundColor: '#3E2723', borderWidth: 1, borderColor: '#8B7355', borderRadius: 8, padding: 14 },
+  tip: {
+    backgroundColor: '#3E2723',
+    borderWidth: 1,
+    borderColor: '#8B7355',
+    borderRadius: 8,
+    padding: 14,
+  },
   tipTitle: { color: '#D6A84F', fontSize: 16, fontWeight: '700', fontFamily: 'Lato_700Bold' },
-  tipBody: { color: '#F4E4C1', fontSize: 14, lineHeight: 20, marginTop: 6, fontFamily: 'Lato_400Regular' },
+  tipBody: {
+    color: '#F4E4C1',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 6,
+    fontFamily: 'Lato_400Regular',
+  },
 });

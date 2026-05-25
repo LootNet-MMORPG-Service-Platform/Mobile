@@ -42,7 +42,10 @@ export default function ResetPasswordScreen() {
           { text: 'OK', onPress: () => router.replace('/(tabs)/profile') },
         ]);
       } else {
-        Alert.alert('Password Change Failed', isSafeAuthError(result.error) ? result.error : 'Unable to change password');
+        Alert.alert(
+          'Password Change Failed',
+          isSafeAuthError(result.error) ? result.error : 'Unable to change password',
+        );
       }
     } catch (_error) {
       Alert.alert('Error', 'An unexpected error occurred');
@@ -119,9 +122,7 @@ export default function ResetPasswordScreen() {
           onPress={handleResetPassword}
           disabled={isLoading}
         >
-          <Text style={styles.buttonText}>
-            {isLoading ? 'Changing...' : 'Change Password'}
-          </Text>
+          <Text style={styles.buttonText}>{isLoading ? 'Changing...' : 'Change Password'}</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
