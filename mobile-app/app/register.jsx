@@ -13,10 +13,11 @@ import { useRouter } from 'expo-router';
 import { usePreventScreenCapture } from 'expo-screen-capture';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '../contexts/AuthContext';
-import { isSafeAuthError, sanitizeUsername, validatePassword, validatePasswordConfirmation, validateUsername } from '../utils/security';
+import { isSafeAuthError, sanitizeEmail, sanitizeUsername, validateEmail, validatePassword, validatePasswordConfirmation, validateUsername } from '../utils/security';
 
 export default function RegisterScreen() {
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -26,12 +27,14 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     const cleanUsername = sanitizeUsername(username);
+    const cleanEmail = sanitizeEmail(email);
     const usernameError = validateUsername(cleanUsername);
+    const emailError = validateEmail(cleanEmail);
     const passwordError = validatePassword(password);
     const confirmationError = validatePasswordConfirmation(password, confirmPassword);
 
-    if (usernameError || passwordError || confirmationError) {
-      Alert.alert('Error', usernameError || passwordError || confirmationError);
+    if (usernameError || emailError || passwordError || confirmationError) {
+      Alert.alert('Error', usernameError || emailError || passwordError || confirmationError);
       return;
     }
 
@@ -39,11 +42,12 @@ export default function RegisterScreen() {
     try {
       const result = await register({
         username: cleanUsername,
+        email: cleanEmail,
         password: password,
       });
       
       if (result.success) {
-        Alert.alert('Success', 'Account created! Please login.');
+        Alert.alert('Success', 'Account created. Check your email before logging in.');
         router.replace('/login');
       } else {
         Alert.alert('Registration Failed', isSafeAuthError(result.error) ? result.error : 'Unable to create account.');
@@ -81,6 +85,23 @@ export default function RegisterScreen() {
               textContentType="username"
               autoComplete="username-new"
               maxLength={32}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <IconSymbol name="email" size={20} color="#D7C0A5" />
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              value={email}
+              onChangeText={(value) => setEmail(value.slice(0, 256))}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              returnKeyType="next"
+              textContentType="emailAddress"
+              autoComplete="email"
+              maxLength={256}
             />
           </View>
 

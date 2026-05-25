@@ -26,7 +26,6 @@ export const AuthProvider = ({ children }) => {
   const backgroundedAtRef = useRef(null);
 
   useEffect(() => {
-    // Check for stored authentication on app start
     const checkAuth = async () => {
       try {
         const isAuth = await authService.loadStoredAuth();
@@ -66,9 +65,9 @@ export const AuthProvider = ({ children }) => {
     return () => subscription.remove();
   }, []);
 
-  const login = async (username, password) => {
+  const login = async (email, password) => {
     try {
-      const result = await authService.login(username, password);
+      const result = await authService.login(email, password);
       if (result.success) {
         setUser(result.user);
         setIsAuthenticated(true);

@@ -13,10 +13,10 @@ import { useRouter } from 'expo-router';
 import { usePreventScreenCapture } from 'expo-screen-capture';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '../contexts/AuthContext';
-import { isSafeAuthError, sanitizeUsername, validatePassword, validateUsername } from '../utils/security';
+import { isSafeAuthError, sanitizeEmail, validateEmail, validatePassword } from '../utils/security';
 
 export default function LoginScreen() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -25,18 +25,18 @@ export default function LoginScreen() {
   usePreventScreenCapture();
 
   const handleLogin = async () => {
-    const cleanUsername = sanitizeUsername(username);
-    const usernameError = validateUsername(cleanUsername);
+    const cleanEmail = sanitizeEmail(email);
+    const emailError = validateEmail(cleanEmail);
     const passwordError = validatePassword(password);
 
-    if (usernameError || passwordError) {
-      Alert.alert('Error', usernameError || passwordError);
+    if (emailError || passwordError) {
+      Alert.alert('Error', emailError || passwordError);
       return;
     }
 
     setIsLoading(true);
     try {
-      const result = await login(cleanUsername, password);
+      const result = await login(cleanEmail, password);
       
       if (result.success) {
         Alert.alert('Success', 'Welcome back!');
@@ -65,18 +65,19 @@ export default function LoginScreen() {
 
         <View style={styles.form}>
           <View style={styles.inputContainer}>
-          <IconSymbol name="person" size={20} color="#D7C0A5" />
+          <IconSymbol name="email" size={20} color="#D7C0A5" />
             <TextInput
               style={styles.input}
-              placeholder="Username"
-              value={username}
-              onChangeText={(value) => setUsername(value.slice(0, 32))}
+              placeholder="Email"
+              value={email}
+              onChangeText={(value) => setEmail(value.slice(0, 256))}
               autoCapitalize="none"
               autoCorrect={false}
+              keyboardType="email-address"
               returnKeyType="next"
-              textContentType="username"
-              autoComplete="username"
-              maxLength={32}
+              textContentType="emailAddress"
+              autoComplete="email"
+              maxLength={256}
             />
           </View>
 

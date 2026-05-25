@@ -5,7 +5,7 @@ export default function ModalScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>LootNet</Text>
-      <Text style={styles.body}>Your inventory, rewards, market listings, and runs live in the main tabs.</Text>
+      <Text style={styles.body}>Your inventory, rewards, and runs live in the main tabs.</Text>
       <Link href="/" dismissTo style={styles.link}>
         <Text style={styles.linkText}>Return Home</Text>
       </Link>

@@ -4,7 +4,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 const tips = [
   {
     title: 'Prepare Gear',
-    body: 'Move items into Adventure Gear before starting a run. Items listed on the market stay out of your adventure choices.',
+    body: 'Move items into Adventure Gear before starting a run.',
   },
   {
     title: 'Start Adventure',

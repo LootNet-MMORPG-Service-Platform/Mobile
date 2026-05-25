@@ -272,10 +272,10 @@ class ApiService {
     return this.request(endpoint);
   }
 
-  async login(username, password) {
+  async login(email, password) {
     return this.request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ email, username: email, password }),
     });
   }
 
@@ -324,7 +324,6 @@ class ApiService {
     const endpoints = {
       inventory: '/mobile/inventory',
       run: '/mobile/inventory/run',
-      market: '/mobile/inventory/market',
     };
     return this.request(endpoints[scope] || endpoints.inventory);
   }
@@ -348,13 +347,6 @@ class ApiService {
   async unequip(itemId) {
     return this.request(`/mobile/unequip/${itemId}`, {
       method: 'POST',
-    });
-  }
-
-  async returnFromMarket(itemId) {
-    return this.request('/mobile/inventory/market/return', {
-      method: 'POST',
-      body: JSON.stringify({ itemId }),
     });
   }
 
@@ -409,29 +401,6 @@ class ApiService {
     });
   }
 
-  async getMarketListings(category = null, pageNumber = 1, pageSize = 20, sort = 'asc') {
-    const params = new URLSearchParams({
-      pageNumber: pageNumber.toString(),
-      pageSize: pageSize.toString(),
-      sort,
-      ...(category && { category }),
-    });
-
-    return this.request(`/market/listing?${params}`);
-  }
-
-  async createMarketListing(listingData) {
-    return this.request('/market/sell', {
-      method: 'POST',
-      body: JSON.stringify(listingData),
-    });
-  }
-
-  async buyMarketItem(itemId) {
-    return this.request(`/market/${itemId}/buy`, {
-      method: 'POST',
-    });
-  }
 }
 
 export default new ApiService();

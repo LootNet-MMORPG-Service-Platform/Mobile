@@ -1,8 +1,24 @@
 const USERNAME_PATTERN = /^[a-zA-Z0-9_.-]{3,32}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_MAX_LENGTH = 128;
 
 export const sanitizeUsername = (value = '') => value.trim().slice(0, 32);
+export const sanitizeEmail = (value = '') => value.trim().toLowerCase().slice(0, 256);
+
+export const validateEmail = (value) => {
+  const email = sanitizeEmail(value);
+
+  if (!email) {
+    return 'Email is required.';
+  }
+
+  if (!EMAIL_PATTERN.test(email)) {
+    return 'Enter a valid email address.';
+  }
+
+  return null;
+};
 
 export const validateUsername = (value) => {
   const username = sanitizeUsername(value);

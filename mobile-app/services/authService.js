@@ -78,50 +78,6 @@ const flattenItemResponse = (response) => {
   return uniqueItems([...weapons, ...armors]);
 };
 
-const normalizeListing = (listing) => ({
-  ...listing,
-  id: listing?.id ?? listing?.Id,
-  itemId: listing?.itemId ?? listing?.ItemId,
-  itemName: listing?.itemName ?? listing?.ItemName,
-  price: listing?.price ?? listing?.Price ?? 0,
-  category: listing?.category ?? listing?.Category,
-});
-
-const normalizeCategory = (category) => {
-  if (category === null || category === undefined || category === '') return null;
-  const raw = String(category).toLowerCase();
-  if (category === 0 || raw === '0' || raw === 'weapon' || raw === 'weapons') return 'Weapon';
-  if (category === 1 || raw === '1' || raw === 'armor' || raw === 'armors') return 'Armor';
-  return String(category);
-};
-
-const listingMatchesCategory = (listing, category) => {
-  const normalizedCategory = normalizeCategory(category);
-  if (!normalizedCategory) return true;
-  return normalizeCategory(listing?.category) === normalizedCategory;
-};
-
-const flattenListingResponse = (response) => {
-  if (Array.isArray(response)) return response;
-  if (Array.isArray(response?.listings)) return response.listings;
-  if (Array.isArray(response?.Listings)) return response.Listings;
-  if (Array.isArray(response?.items)) return response.items;
-  if (Array.isArray(response?.Items)) return response.Items;
-  if (Array.isArray(response?.data)) return response.data;
-  if (Array.isArray(response?.Data)) return response.Data;
-  return [];
-};
-
-const uniqueListings = (listings) => {
-  const seen = new Set();
-  return listings.map(normalizeListing).filter((listing) => {
-    const key = listing?.itemId || listing?.id;
-    if (!key || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-};
-
 const OPPONENT_TYPES = [
   { name: 'Raider', hp: 35, position: 2 },
   { name: 'Duelist', hp: 42, position: 2 },
@@ -134,7 +90,6 @@ class AuthService {
     this.isAuthenticated = false;
     this.tokenRefreshInterval = null;
     this.localEquipmentSlots = {};
-    this.localMarketListings = [];
     this.localRun = null;
     this.localBattle = null;
     this.adventureRewards = [];
@@ -164,9 +119,9 @@ class AuthService {
     }
   }
 
-  async login(username, password) {
+  async login(email, password) {
     try {
-      const response = await api.login(username, password);
+      const response = await api.login(email, password);
       const { token, refreshToken } = response;
 
       await Storage.setItem('authToken', token);
@@ -238,7 +193,6 @@ class AuthService {
     this.user = null;
     this.isAuthenticated = false;
     this.localEquipmentSlots = {};
-    this.localMarketListings = [];
     this.localRun = null;
     this.localBattle = null;
     this.adventureRewards = [];
@@ -341,16 +295,9 @@ class AuthService {
   }
 
   async getInventory(scope = 'inventory') {
-    const listedIds = new Set(this.localMarketListings.filter((x) => !x.isSold).map((x) => x.itemId));
-
     try {
       const response = await api.getInventory(scope);
       const apiItems = uniqueItems([...flattenItemResponse(response), ...(scope === 'inventory' ? this.adventureRewards : [])]);
-
-      if (scope === 'market') {
-        const localItems = (await this.getAllKnownItems()).filter((item) => listedIds.has(item.id));
-        return { success: true, data: uniqueItems([...apiItems, ...localItems]) };
-      }
 
       if (scope === 'run') {
         const runIds = new Set(this.localRun?.itemIds || []);
@@ -358,20 +305,16 @@ class AuthService {
         return { success: true, data: uniqueItems([...apiItems, ...localRunItems]) };
       }
 
-      return { success: true, data: apiItems.filter((item) => !listedIds.has(item.id)) };
+      return { success: true, data: apiItems };
     } catch (error) {
       const items = await this.getAllKnownItems();
-
-      if (scope === 'market') {
-        return { success: true, data: items.filter((item) => listedIds.has(item.id)) };
-      }
 
       if (scope === 'run') {
         const runIds = new Set(this.localRun?.itemIds || []);
         return { success: true, data: items.filter((item) => runIds.has(item.id)) };
       }
 
-      return { success: true, data: items.filter((item) => !listedIds.has(item.id)) };
+      return { success: true, data: items };
     }
   }
 
@@ -446,7 +389,7 @@ class AuthService {
     try {
       await api.unequip(itemIdValue);
     } catch (_error) {
-      // Local equipment still updates when the API route is unavailable.
+      logAuthWarning('Unequip failed', _error);
     }
 
     Object.keys(this.localEquipmentSlots).forEach((key) => {
@@ -646,20 +589,10 @@ class AuthService {
     try {
       await api.endRun();
     } catch (_error) {
-      // Local run cleanup still happens when the API route is unavailable.
+      logAuthWarning('Run end failed', _error);
     }
     this.localRun = null;
     this.localBattle = null;
-    return { success: true };
-  }
-
-  async returnFromMarket(itemIdValue) {
-    try {
-      await api.returnFromMarket(itemIdValue);
-    } catch (_error) {
-      // Local listing recall below keeps the UI moving if the API route is unavailable.
-    }
-    this.localMarketListings = this.localMarketListings.filter((listing) => listing.itemId !== itemIdValue);
     return { success: true };
   }
 
@@ -683,58 +616,6 @@ class AuthService {
     }
   }
 
-  async getMarketListings(category = null, pageNumber = 1, pageSize = 20, sort = 'asc') {
-    const local = this.localMarketListings
-      .filter((listing) => !listing.isSold && listingMatchesCategory(listing, category))
-      .sort((a, b) => sort === 'desc' ? Number(b.price) - Number(a.price) : Number(a.price) - Number(b.price));
-
-    try {
-      const response = await api.getMarketListings(category, pageNumber, pageSize, sort);
-      const listings = uniqueListings([...local, ...flattenListingResponse(response)])
-        .filter((listing) => listingMatchesCategory(listing, category))
-        .sort((a, b) => sort === 'desc' ? Number(b.price) - Number(a.price) : Number(a.price) - Number(b.price));
-      return { success: true, data: listings };
-    } catch (_error) {
-      return { success: true, data: local };
-    }
-  }
-
-  async createMarketListing(itemIdValue, price) {
-    const numericPrice = Number(price);
-    const items = await this.getAllKnownItems();
-    const item = items.find((candidate) => candidate.id === itemIdValue);
-
-    try {
-      const response = await api.createMarketListing({ itemId: itemIdValue, price: numericPrice });
-      const listing = normalizeListing({
-        ...(response || {}),
-        id: response?.id ?? response?.Id ?? `listed-${itemIdValue}`,
-        itemId: response?.itemId ?? response?.ItemId ?? itemIdValue,
-        itemName: response?.itemName ?? response?.ItemName ?? item?.name ?? 'Listed item',
-        price: response?.price ?? response?.Price ?? numericPrice,
-        category: response?.category ?? response?.Category ?? (isWeapon(item) ? 'Weapon' : 'Armor'),
-        isSold: false,
-      });
-      this.localMarketListings = uniqueListings([listing, ...this.localMarketListings]);
-      return { success: true, data: listing };
-    } catch (error) {
-      return { success: false, error: error.message || 'Could not list item on the market' };
-    }
-  }
-
-  async buyMarketItem(listingId) {
-    try {
-      const response = await api.buyMarketItem(listingId);
-      return { success: true, data: response };
-    } catch (_error) {
-      const listing = this.localMarketListings.find((candidate) => candidate.id === listingId);
-      if (!listing) {
-        return { success: false, error: 'Listing is not available right now' };
-      }
-      listing.isSold = true;
-      return { success: true, data: { message: 'Item bought' } };
-    }
-  }
 }
 
 export default new AuthService();

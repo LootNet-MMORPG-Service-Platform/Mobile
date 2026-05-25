@@ -40,6 +40,18 @@ If Expo warns that package versions should be aligned, run:
 npx expo install
 ```
 
+## Linting
+
+The project uses Expo ESLint through `eslint-config-expo`.
+
+Linting is enabled in `eslint.config.js` and exposed through the `lint` script in `package.json`:
+
+```cmd
+npm run lint
+```
+
+Run this before handing in changes.
+
 ## Start The Backend
 
 From the backend API project folder:
@@ -135,8 +147,9 @@ Start the backend first, then start Expo.
 Recommended test flow:
 
 1. Open the app in Expo Go.
-2. Create a new account.
-3. Log in with that same account.
+2. Create a new account with username, email, and password.
+3. Verify the email if the backend requires verification.
+4. Log in with email and password.
 
 Seeded backend users may not log in if their stored password is not a real BCrypt password.
 
