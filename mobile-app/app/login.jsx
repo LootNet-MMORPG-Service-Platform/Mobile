@@ -9,12 +9,16 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { usePreventScreenCapture } from 'expo-screen-capture';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '../contexts/AuthContext';
 import { isSafeAuthError, sanitizeEmail, validateEmail, validatePassword } from '../utils/security';
+
+const lintPracticeMessage = 'remove me with lint cleanup';
+const lintPracticeCount = 3;
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -23,6 +27,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
+  const unusedLoginDebugValue = lintPracticeCount;
   usePreventScreenCapture();
 
   const handleLogin = async () => {
