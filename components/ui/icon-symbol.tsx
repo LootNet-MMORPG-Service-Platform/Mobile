@@ -37,6 +37,7 @@ const MAPPING = {
   person: 'person',
   'play.fill': 'play-arrow',
   shield: 'security',
+  store: 'storefront',
   sword: 'sports-martial-arts',
   trophy: 'emoji-events',
   xmark: 'close',

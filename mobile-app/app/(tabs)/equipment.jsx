@@ -8,11 +8,16 @@ import authService from '../../services/authService';
 const MENU = [
   { key: 'inventory', label: 'Inventory' },
   { key: 'run', label: 'Adventure Gear' },
+  { key: 'market', label: 'Market Listings' },
   { key: 'equipment', label: 'Equipment' },
 ];
 
 const FILTERS = ['all', 'weapon', 'armor'];
 const SLOTS = [1, 2, 3, 4];
+const DIFFICULTIES = [
+  { key: 'easy', label: 'Scout', description: 'A lighter path with one foe' },
+  { key: 'normal', label: 'Warband', description: 'Standard challenge' },
+];
 
 const fmt = (v) => Number(v ?? 0).toFixed(1);
 const isWeapon = (i) => i?.weaponType !== undefined;
@@ -24,8 +29,11 @@ export default function EquipmentScreen() {
   const [activeRun, setActiveRun] = useState(null);
   const [inventory, setInventory] = useState([]);
   const [runInventory, setRunInventory] = useState([]);
+  const [marketInventory, setMarketInventory] = useState([]);
   const [equipPool, setEquipPool] = useState([]);
   const [equipmentSlots, setEquipmentSlots] = useState({});
+  const [selectedRunLoadout, setSelectedRunLoadout] = useState([]);
+  const [runDifficulty, setRunDifficulty] = useState('easy');
   const [detailItem, setDetailItem] = useState(null);
 
   const applyFilter = useCallback(
@@ -51,23 +59,25 @@ export default function EquipmentScreen() {
       setInventory(inv.success ? inv.data || [] : []);
       if (!inv.success) Alert.alert('Error', inv.error || 'Cannot load inventory');
     } else if (view === 'run') {
-      const [inv, runInv, equipped] = await Promise.all([
+      const [inv, runInv] = await Promise.all([
         authService.getInventory('inventory'),
         authService.getInventory('run'),
-        authService.getEquippedItems(),
       ]);
       const invData = inv.success ? inv.data || [] : [];
       setInventory(invData);
-      setRunInventory(
-        runData
-          ? runInv.success
-            ? runInv.data || []
-            : []
-          : equipped.success
-            ? equipped.data || []
-            : [],
-      );
+      setRunInventory(runInv.success ? runInv.data || [] : []);
       if (!inv.success || !runInv.success) Alert.alert('Error', 'Cannot load adventure gear');
+
+      if (!runData) {
+        setSelectedRunLoadout((prev) => {
+          const valid = new Set(invData.map((x) => x.id));
+          return prev.filter((id) => valid.has(id));
+        });
+      }
+    } else if (view === 'market') {
+      const market = await authService.getInventory('market');
+      setMarketInventory(market.success ? market.data || [] : []);
+      if (!market.success) Alert.alert('Error', market.error || 'Cannot load market inventory');
     } else if (view === 'equipment') {
       const [slots, inv] = await Promise.all([
         authService.getEquipmentSlots(),
@@ -86,22 +96,41 @@ export default function EquipmentScreen() {
     }, [loadData]),
   );
 
+  const pushToRunLoadout = (itemId) => {
+    if (activeRun) return;
+    setSelectedRunLoadout((prev) => (prev.includes(itemId) ? prev : [...prev, itemId]));
+  };
+
+  const removeFromRunLoadout = (itemId) => {
+    if (activeRun) return;
+    setSelectedRunLoadout((prev) => prev.filter((x) => x !== itemId));
+  };
+
   const startRunWithLoadout = async () => {
     if (activeRun) {
       Alert.alert('Run active', 'You already have an active run.');
       return;
     }
-    const equippedItems = await authService.getEquippedItems();
-    if (!equippedItems.success || !(equippedItems.data || []).length) {
-      Alert.alert('Run', 'Equip at least one item before starting a run.');
+    if (!selectedRunLoadout.length) {
+      Alert.alert('Run', 'Select adventure gear first.');
       return;
     }
-    const result = await authService.startRun([]);
+    const result = await authService.startRun(selectedRunLoadout, runDifficulty);
     if (!result.success) {
       Alert.alert('Start failed', result.error || 'Cannot start run');
       return;
     }
+    setSelectedRunLoadout([]);
     await loadData();
+  };
+
+  const recall = async (itemId) => {
+    const res = await authService.returnFromMarket(itemId);
+    if (!res.success) {
+      Alert.alert('Recall failed', res.error || 'Cannot recall item');
+      return;
+    }
+    loadData();
   };
 
   const equipArmor = async (itemId) => {
@@ -124,6 +153,10 @@ export default function EquipmentScreen() {
 
   const filteredInventory = useMemo(() => applyFilter(inventory), [inventory, applyFilter]);
   const filteredRun = useMemo(() => applyFilter(runInventory), [runInventory, applyFilter]);
+  const filteredMarket = useMemo(
+    () => applyFilter(marketInventory),
+    [marketInventory, applyFilter],
+  );
   const filteredEquipPool = useMemo(() => applyFilter(equipPool), [equipPool, applyFilter]);
   const equippedItemIds = useMemo(() => {
     const ids = new Set();
@@ -137,14 +170,17 @@ export default function EquipmentScreen() {
     [filteredEquipPool, equippedItemIds],
   );
 
+  const runLoadoutItems = useMemo(() => {
+    const byId = new Map(inventory.map((x) => [x.id, x]));
+    return selectedRunLoadout.map((id) => byId.get(id)).filter(Boolean);
+  }, [selectedRunLoadout, inventory]);
+
+  const inRunLoadout = useMemo(() => new Set(selectedRunLoadout), [selectedRunLoadout]);
+
   const renderMiniCard = (item, options = {}) => {
-    const { showStats = false, extraAction = null, horizontal = false } = options;
+    const { showStats = false, extraAction = null } = options;
     return (
-      <TouchableOpacity
-        key={item.id}
-        style={[styles.miniCard, horizontal && styles.miniCardHorizontal]}
-        onPress={() => setDetailItem(item)}
-      >
+      <TouchableOpacity key={item.id} style={styles.miniCard} onPress={() => setDetailItem(item)}>
         <IconSymbol name={isWeapon(item) ? 'sword' : 'shield'} size={22} color="#F4E4C1" />
         {showStats && (
           <Text style={styles.miniStats}>
@@ -161,225 +197,293 @@ export default function EquipmentScreen() {
   const showFilters = !!view;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>INVENTORY</Text>
-        </View>
-
-        {!view && (
-          <View style={styles.menuWrap}>
-            {MENU.map((m) => (
-              <TouchableOpacity key={m.key} style={styles.menuBtn} onPress={() => setView(m.key)}>
-                <Text style={styles.menuTxt}>{m.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {view && (
-          <>
-            <TouchableOpacity style={styles.back} onPress={() => setView(null)}>
-              <IconSymbol name="chevron.left" size={16} color="#F4E4C1" />
-              <Text style={styles.backTxt}>Back to Menu</Text>
-            </TouchableOpacity>
-
-            {showFilters && (
-              <View style={styles.filterContainer}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.filterRow}
-                  contentContainerStyle={styles.filterRowContent}
-                >
-                  {FILTERS.map((f) => (
-                    <TouchableOpacity
-                      key={f}
-                      style={[styles.filterBtn, filter === f && styles.filterBtnActive]}
-                      onPress={() => setFilter(f)}
-                    >
-                      <Text style={[styles.filterTxt, filter === f && styles.filterTxtActive]}>
-                        {f.toUpperCase()}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
-            {loading && <Text style={styles.helper}>Loading...</Text>}
-
-            {view === 'inventory' && (
-              <>
-                {activeRun ? (
-                  <Text style={styles.lockInfo}>Run is active. Selection is locked.</Text>
-                ) : (
-                  <Text style={styles.lockInfo}>Inventory view.</Text>
-                )}
-                <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-                  {filteredInventory.map((i) =>
-                    renderMiniCard(i, {
-                      showStats: true,
-                    }),
-                  )}
-                </ScrollView>
-              </>
-            )}
-
-            {view === 'run' && (
-              <>
-                {activeRun ? (
-                  <Text style={styles.lockInfo}>
-                    Run is active. Run inventory editing is blocked.
-                  </Text>
-                ) : (
-                  <TouchableOpacity style={styles.startBtn} onPress={startRunWithLoadout}>
-                    <Text style={styles.startTxt}>Start Run (equipped gear at risk)</Text>
-                  </TouchableOpacity>
-                )}
-
-                {!activeRun && (
-                  <>
-                    <Text style={styles.sectionLabel}>Equipped Gear at Risk</Text>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.horizontalList}
-                      contentContainerStyle={styles.horizontalListContent}
-                    >
-                      {filteredRun.map((i) =>
-                        renderMiniCard(i, { showStats: true, horizontal: true }),
-                      )}
-                      {filteredRun.length === 0 && (
-                        <Text style={styles.helper}>No equipped items.</Text>
-                      )}
-                    </ScrollView>
-
-                    <Text style={styles.sectionLabel}>Inventory Gear</Text>
-                    <Text style={styles.lockInfo}>
-                      Only equipped items are sent into a run and can be lost.
-                    </Text>
-                    <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-                      {filteredInventory.map((i) => renderMiniCard(i, { showStats: true }))}
-                    </ScrollView>
-                  </>
-                )}
-
-                {activeRun && (
-                  <>
-                    <Text style={styles.sectionLabel}>Adventure Gear</Text>
-                    <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-                      {filteredRun.map((i) => renderMiniCard(i, { showStats: true }))}
-                    </ScrollView>
-                  </>
-                )}
-              </>
-            )}
-
-            {view === 'equipment' && (
-              <>
-                <View style={styles.slotGrid}>
-                  {SLOTS.map((s) => (
-                    <TouchableOpacity
-                      key={`w${s}`}
-                      style={styles.slotCard}
-                      onPress={() => {
-                        const item = equipmentSlots[`weapon${s}`] || equipmentSlots[`Weapon${s}`];
-                        if (item) setDetailItem(item);
-                      }}
-                    >
-                      <Text style={styles.slotLabel}>Weapon {s}</Text>
-                      <Text style={styles.slotValue}>
-                        {equipmentSlots[`weapon${s}`]?.name ||
-                          equipmentSlots[`Weapon${s}`]?.name ||
-                          'Empty'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                  {['head', 'body', 'gloves', 'legs', 'boots'].map((k) => (
-                    <TouchableOpacity
-                      key={k}
-                      style={styles.slotCard}
-                      onPress={() => {
-                        const key = k.charAt(0).toUpperCase() + k.slice(1);
-                        const item = equipmentSlots[k] || equipmentSlots[key];
-                        if (item) setDetailItem(item);
-                      }}
-                    >
-                      <Text style={styles.slotLabel}>{k.toUpperCase()}</Text>
-                      <Text style={styles.slotValue}>
-                        {equipmentSlots[k]?.name ||
-                          equipmentSlots[k.charAt(0).toUpperCase() + k.slice(1)]?.name ||
-                          'Empty'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-                  {filteredUnequippedPool.map((i) =>
-                    renderMiniCard(i, {
-                      showStats: true,
-                      extraAction: isWeapon(i) ? (
-                        <View style={styles.slotBtnsRow}>
-                          {SLOTS.map((s) => (
-                            <TouchableOpacity
-                              key={s}
-                              style={styles.actionBtn}
-                              onPress={() => equipWeaponToSlot(i.id, s)}
-                            >
-                              <Text style={styles.actionTxt}>S{s}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      ) : (
-                        <TouchableOpacity style={styles.actionBtn} onPress={() => equipArmor(i.id)}>
-                          <Text style={styles.actionTxt}>Equip</Text>
-                        </TouchableOpacity>
-                      ),
-                    }),
-                  )}
-                </ScrollView>
-              </>
-            )}
-          </>
-        )}
-
-        {detailItem && (
-          <TouchableOpacity style={styles.modalBg} onPress={() => setDetailItem(null)}>
-            <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>{detailItem.name}</Text>
-              <Text style={styles.modalLine}>
-                {isWeapon(detailItem)
-                  ? `Cut ${fmt(detailItem.cut)} / Blunt ${fmt(detailItem.blunt)}`
-                  : `Cut Res ${fmt(detailItem.cutResistance)} / Blunt Res ${fmt(detailItem.bluntResistance)}`}
-              </Text>
-              {!!detailItem.elements?.length && (
-                <Text style={styles.modalLine}>
-                  Elements: {detailItem.elements.map((e) => e.type).join(', ')}
-                </Text>
-              )}
-            </View>
-          </TouchableOpacity>
-        )}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Inventory</Text>
       </View>
+
+      {!view && (
+        <View style={styles.menuWrap}>
+          {MENU.map((m) => (
+            <TouchableOpacity key={m.key} style={styles.menuBtn} onPress={() => setView(m.key)}>
+              <Text style={styles.menuTxt}>{m.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {view && (
+        <>
+          <TouchableOpacity style={styles.back} onPress={() => setView(null)}>
+            <IconSymbol name="chevron.left" size={16} color="#F4E4C1" />
+            <Text style={styles.backTxt}>Back to Menu</Text>
+          </TouchableOpacity>
+
+          {showFilters && (
+            <View style={styles.filterContainer}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.filterRow}
+                contentContainerStyle={styles.filterRowContent}
+              >
+                {FILTERS.map((f) => (
+                  <TouchableOpacity
+                    key={f}
+                    style={[styles.filterBtn, filter === f && styles.filterBtnActive]}
+                    onPress={() => setFilter(f)}
+                  >
+                    <Text style={[styles.filterTxt, filter === f && styles.filterTxtActive]}>
+                      {f.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {loading && <Text style={styles.helper}>Loading...</Text>}
+
+          {view === 'inventory' && (
+            <>
+              {activeRun ? (
+                <Text style={styles.lockInfo}>Run is active. Selection is locked.</Text>
+              ) : (
+                <Text style={styles.lockInfo}>Inventory view.</Text>
+              )}
+              <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+                {filteredInventory.map((i) =>
+                  renderMiniCard(i, {
+                    showStats: true,
+                  }),
+                )}
+              </ScrollView>
+            </>
+          )}
+
+          {view === 'run' && (
+            <>
+              {activeRun ? (
+                <Text style={styles.lockInfo}>
+                  Run is active. Run inventory editing is blocked.
+                </Text>
+              ) : (
+                <TouchableOpacity style={styles.startBtn} onPress={startRunWithLoadout}>
+                  <Text style={styles.startTxt}>
+                    Start Run ({selectedRunLoadout.length} selected)
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {!activeRun && (
+                <>
+                  <Text style={styles.sectionLabel}>Difficulty</Text>
+                  <View style={styles.difficultyRow}>
+                    {DIFFICULTIES.map((difficulty) => (
+                      <TouchableOpacity
+                        key={difficulty.key}
+                        style={[
+                          styles.difficultyBtn,
+                          runDifficulty === difficulty.key && styles.difficultyBtnActive,
+                        ]}
+                        onPress={() => setRunDifficulty(difficulty.key)}
+                      >
+                        <Text
+                          style={[
+                            styles.difficultyTitle,
+                            runDifficulty === difficulty.key && styles.difficultyTitleActive,
+                          ]}
+                        >
+                          {difficulty.label}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.difficultyDesc,
+                            runDifficulty === difficulty.key && styles.difficultyDescActive,
+                          ]}
+                        >
+                          {difficulty.description}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text style={styles.sectionLabel}>Selected Adventure Gear</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.horizontalList}
+                    contentContainerStyle={styles.horizontalListContent}
+                  >
+                    {runLoadoutItems.map((i) =>
+                      renderMiniCard(i, {
+                        showStats: true,
+                        extraAction: (
+                          <TouchableOpacity
+                            style={styles.actionBtn}
+                            onPress={() => removeFromRunLoadout(i.id)}
+                          >
+                            <Text style={styles.actionTxt}>Remove</Text>
+                          </TouchableOpacity>
+                        ),
+                      }),
+                    )}
+                    {runLoadoutItems.length === 0 && (
+                      <Text style={styles.helper}>No selected items.</Text>
+                    )}
+                  </ScrollView>
+
+                  <Text style={styles.sectionLabel}>Choose Gear</Text>
+                  <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+                    {filteredInventory.map((i) =>
+                      renderMiniCard(i, {
+                        showStats: true,
+                        extraAction: (
+                          <TouchableOpacity
+                            style={[
+                              styles.actionBtn,
+                              inRunLoadout.has(i.id) && styles.actionBtnActive,
+                            ]}
+                            onPress={() => pushToRunLoadout(i.id)}
+                          >
+                            <Text style={styles.actionTxt}>
+                              {inRunLoadout.has(i.id) ? 'Added' : 'Take Along'}
+                            </Text>
+                          </TouchableOpacity>
+                        ),
+                      }),
+                    )}
+                  </ScrollView>
+                </>
+              )}
+
+              {activeRun && (
+                <>
+                  <Text style={styles.sectionLabel}>Adventure Gear</Text>
+                  <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+                    {filteredRun.map((i) => renderMiniCard(i, { showStats: true }))}
+                  </ScrollView>
+                </>
+              )}
+            </>
+          )}
+
+          {view === 'market' && (
+            <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+              {filteredMarket.map((i) =>
+                renderMiniCard(i, {
+                  showStats: true,
+                  extraAction: (
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => recall(i.id)}>
+                      <Text style={styles.actionTxt}>Recall</Text>
+                    </TouchableOpacity>
+                  ),
+                }),
+              )}
+            </ScrollView>
+          )}
+
+          {view === 'equipment' && (
+            <>
+              <View style={styles.slotGrid}>
+                {SLOTS.map((s) => (
+                  <TouchableOpacity
+                    key={`w${s}`}
+                    style={styles.slotCard}
+                    onPress={() => {
+                      const item = equipmentSlots[`weapon${s}`] || equipmentSlots[`Weapon${s}`];
+                      if (item) setDetailItem(item);
+                    }}
+                  >
+                    <Text style={styles.slotLabel}>Weapon {s}</Text>
+                    <Text style={styles.slotValue}>
+                      {equipmentSlots[`weapon${s}`]?.name ||
+                        equipmentSlots[`Weapon${s}`]?.name ||
+                        'Empty'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                {['head', 'body', 'gloves', 'legs', 'boots'].map((k) => (
+                  <TouchableOpacity
+                    key={k}
+                    style={styles.slotCard}
+                    onPress={() => {
+                      const key = k.charAt(0).toUpperCase() + k.slice(1);
+                      const item = equipmentSlots[k] || equipmentSlots[key];
+                      if (item) setDetailItem(item);
+                    }}
+                  >
+                    <Text style={styles.slotLabel}>{k.toUpperCase()}</Text>
+                    <Text style={styles.slotValue}>
+                      {equipmentSlots[k]?.name ||
+                        equipmentSlots[k.charAt(0).toUpperCase() + k.slice(1)]?.name ||
+                        'Empty'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+                {filteredUnequippedPool.map((i) =>
+                  renderMiniCard(i, {
+                    showStats: true,
+                    extraAction: isWeapon(i) ? (
+                      <View style={styles.slotBtnsRow}>
+                        {SLOTS.map((s) => (
+                          <TouchableOpacity
+                            key={s}
+                            style={styles.actionBtn}
+                            onPress={() => equipWeaponToSlot(i.id, s)}
+                          >
+                            <Text style={styles.actionTxt}>S{s}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    ) : (
+                      <TouchableOpacity style={styles.actionBtn} onPress={() => equipArmor(i.id)}>
+                        <Text style={styles.actionTxt}>Equip</Text>
+                      </TouchableOpacity>
+                    ),
+                  }),
+                )}
+              </ScrollView>
+            </>
+          )}
+        </>
+      )}
+
+      {detailItem && (
+        <TouchableOpacity style={styles.modalBg} onPress={() => setDetailItem(null)}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{detailItem.name}</Text>
+            <Text style={styles.modalLine}>
+              {isWeapon(detailItem)
+                ? `Cut ${fmt(detailItem.cut)} / Blunt ${fmt(detailItem.blunt)}`
+                : `Cut Res ${fmt(detailItem.cutResistance)} / Blunt Res ${fmt(detailItem.bluntResistance)}`}
+            </Text>
+            {!!detailItem.elements?.length && (
+              <Text style={styles.modalLine}>
+                Elements: {detailItem.elements.map((e) => e.type).join(', ')}
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#1A0E08' },
   container: { flex: 1, backgroundColor: '#2C1810' },
   header: {
-    alignItems: 'center',
-    padding: 24,
     backgroundColor: '#1A0E08',
+    paddingVertical: 12,
     borderBottomWidth: 2,
     borderBottomColor: '#8B7355',
   },
   title: {
     color: '#F4E4C1',
     textAlign: 'center',
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: '700',
     fontFamily: 'Lato_700Bold',
   },
@@ -449,28 +553,42 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontFamily: 'Lato_700Bold',
   },
-  list: { flex: 1, paddingHorizontal: 10 },
-  listContent: {
-    paddingBottom: 16,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+  difficultyRow: { flexDirection: 'row', gap: 8, marginHorizontal: 10, marginBottom: 10 },
+  difficultyBtn: {
+    flex: 1,
+    backgroundColor: '#3E2723',
+    borderWidth: 1,
+    borderColor: '#8B7355',
+    borderRadius: 8,
+    padding: 10,
   },
+  difficultyBtnActive: { backgroundColor: '#D6A84F', borderColor: '#F4E4C1' },
+  difficultyTitle: {
+    color: '#F4E4C1',
+    fontSize: 13,
+    fontWeight: '700',
+    fontFamily: 'Lato_700Bold',
+  },
+  difficultyTitleActive: { color: '#2C1810' },
+  difficultyDesc: { color: '#A0826D', fontSize: 11, marginTop: 4, fontFamily: 'Lato_400Regular' },
+  difficultyDescActive: { color: '#3E2723' },
+  list: { flex: 1, paddingHorizontal: 10 },
+  listContent: { paddingBottom: 16 },
   horizontalList: { maxHeight: 126, marginBottom: 8 },
   horizontalListContent: { paddingHorizontal: 10, alignItems: 'center' },
   miniCard: {
-    width: '48%',
+    width: 148,
     minHeight: 84,
     backgroundColor: '#3E2723',
     borderWidth: 1,
     borderColor: '#8B7355',
     borderRadius: 8,
     padding: 8,
+    marginRight: 8,
     marginBottom: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  miniCardHorizontal: { width: 148, marginRight: 8 },
   miniStats: {
     color: '#A0826D',
     marginTop: 6,
