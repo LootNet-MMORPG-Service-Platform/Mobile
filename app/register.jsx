@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,41 +10,67 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { usePreventScreenCapture } from 'expo-screen-capture';
+import * as ScreenCapture from 'expo-screen-capture';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '../contexts/AuthContext';
-import { isSafeAuthError, sanitizeEmail, validateEmail, validatePassword } from '../utils/security';
+import {
+  isSafeAuthError,
+  sanitizeEmail,
+  sanitizeUsername,
+  validateEmail,
+  validatePassword,
+  validatePasswordConfirmation,
+  validateUsername,
+} from '../utils/security';
 
-export default function LoginScreen() {
+export default function RegisterScreen() {
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
-  const { login } = useAuth();
-  usePreventScreenCapture();
+  const { register } = useAuth();
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      return undefined;
+    }
 
-  const handleLogin = async () => {
+    void ScreenCapture.preventScreenCaptureAsync();
+    return () => {
+      void ScreenCapture.allowScreenCaptureAsync();
+    };
+  }, []);
+
+  const handleRegister = async () => {
+    const cleanUsername = sanitizeUsername(username);
     const cleanEmail = sanitizeEmail(email);
+    const usernameError = validateUsername(cleanUsername);
     const emailError = validateEmail(cleanEmail);
-    const passwordError = validatePassword(password);
+    const passwordError = validatePassword(password, 'Password', true);
+    const confirmationError = validatePasswordConfirmation(password, confirmPassword);
 
-    if (emailError || passwordError) {
-      Alert.alert('Error', emailError || passwordError);
+    if (usernameError || emailError || passwordError || confirmationError) {
+      Alert.alert('Error', usernameError || emailError || passwordError || confirmationError);
       return;
     }
 
     setIsLoading(true);
     try {
-      const result = await login(cleanEmail, password);
+      const result = await register({
+        username: cleanUsername,
+        email: cleanEmail,
+        password,
+        verificationClient: 1,
+      });
 
       if (result.success) {
-        Alert.alert('Success', 'Welcome back!');
-        router.replace('/(tabs)');
+        Alert.alert('Success', 'Account created. Check your email before logging in.');
+        router.replace('/login');
       } else {
         Alert.alert(
-          'Login Failed',
-          isSafeAuthError(result.error) ? result.error : 'Unable to sign in.',
+          'Registration Failed',
+          isSafeAuthError(result.error) ? result.error : 'Unable to create account.',
         );
       }
     } catch (_error) {
@@ -62,11 +88,27 @@ export default function LoginScreen() {
       <View style={styles.content}>
         <View style={styles.header}>
           <IconSymbol name="shield" size={48} color="#8B7355" />
-          <Text style={styles.title}>LootNet</Text>
-          <Text style={styles.subtitle}>Companion App</Text>
+          <Text style={styles.title}>Join LootNet</Text>
+          <Text style={styles.subtitle}>Create your account</Text>
         </View>
 
         <View style={styles.form}>
+          <View style={styles.inputContainer}>
+            <IconSymbol name="person" size={20} color="#D7C0A5" />
+            <TextInput
+              style={styles.input}
+              placeholder="Username"
+              value={username}
+              onChangeText={(value) => setUsername(value.slice(0, 32))}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+              textContentType="username"
+              autoComplete="username-new"
+              maxLength={32}
+            />
+          </View>
+
           <View style={styles.inputContainer}>
             <IconSymbol name="email" size={20} color="#D7C0A5" />
             <TextInput
@@ -91,30 +133,44 @@ export default function LoginScreen() {
               placeholder="Password"
               value={password}
               onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              returnKeyType="done"
-              textContentType="password"
-              autoComplete="password"
+              secureTextEntry
+              returnKeyType="next"
+              textContentType="newPassword"
+              autoComplete="new-password"
               maxLength={128}
-              onSubmitEditing={handleLogin}
             />
-            <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
-              <IconSymbol name={showPassword ? 'eye.slash' : 'eye'} size={20} color="#D7C0A5" />
-            </TouchableOpacity>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <IconSymbol name="lock" size={20} color="#D7C0A5" />
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm Password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              returnKeyType="done"
+              textContentType="newPassword"
+              autoComplete="new-password"
+              maxLength={128}
+              onSubmitEditing={handleRegister}
+            />
           </View>
 
           <TouchableOpacity
-            style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
-            onPress={handleLogin}
+            style={[styles.registerButton, isLoading && styles.registerButtonDisabled]}
+            onPress={handleRegister}
             disabled={isLoading}
           >
-            <Text style={styles.loginButtonText}>{isLoading ? 'Logging in...' : 'Login'}</Text>
+            <Text style={styles.registerButtonText}>
+              {isLoading ? 'Creating Account...' : 'Create Account'}
+            </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.footer}>
-          <TouchableOpacity onPress={() => router.push('/register')}>
-            <Text style={styles.footerLink}>Create Account</Text>
+          <TouchableOpacity onPress={() => router.push('/login')}>
+            <Text style={styles.footerLink}>Already have an account? Login</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -138,7 +194,6 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontFamily: 'UnifrakturMaguntia_400Regular',
     fontWeight: 'bold',
     color: '#F4E4C1',
     marginTop: 10,
@@ -172,10 +227,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginLeft: 10,
   },
-  eyeIcon: {
-    padding: 10,
-  },
-  loginButton: {
+  registerButton: {
     backgroundColor: '#8B7355',
     borderRadius: 8,
     height: 50,
@@ -188,23 +240,22 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  loginButtonDisabled: {
+  registerButtonDisabled: {
     backgroundColor: '#654321',
   },
-  loginButtonText: {
+  registerButtonText: {
     color: '#F4E4C1',
     fontSize: 20,
     fontWeight: 'bold',
     textTransform: 'uppercase',
   },
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     marginTop: 30,
   },
   footerLink: {
     color: '#D7C0A5',
     fontSize: 16,
     textDecorationLine: 'underline',
+    textAlign: 'center',
   },
 });

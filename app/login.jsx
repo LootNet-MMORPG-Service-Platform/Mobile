@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { usePreventScreenCapture } from 'expo-screen-capture';
+import * as ScreenCapture from 'expo-screen-capture';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '../contexts/AuthContext';
 import { isSafeAuthError, sanitizeEmail, validateEmail, validatePassword } from '../utils/security';
@@ -22,12 +22,21 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
-  usePreventScreenCapture();
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      return undefined;
+    }
+
+    void ScreenCapture.preventScreenCaptureAsync();
+    return () => {
+      void ScreenCapture.allowScreenCaptureAsync();
+    };
+  }, []);
 
   const handleLogin = async () => {
     const cleanEmail = sanitizeEmail(email);
     const emailError = validateEmail(cleanEmail);
-    const passwordError = validatePassword(password);
+    const passwordError = validatePassword(password, 'Password', true);
 
     if (emailError || passwordError) {
       Alert.alert('Error', emailError || passwordError);
