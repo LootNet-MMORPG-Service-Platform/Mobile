@@ -82,16 +82,6 @@ const flattenItemResponse = (response) => {
   return uniqueItems([...weapons, ...armors]);
 };
 
-const normalizeListing = (listing) => ({
-  ...listing,
-  id: listing?.id ?? listing?.Id,
-  itemId: listing?.itemId ?? listing?.ItemId,
-  itemName: listing?.itemName ?? listing?.ItemName,
-  price: listing?.price ?? listing?.Price ?? 0,
-  category: listing?.category ?? listing?.Category,
-  isSold: listing?.isSold ?? listing?.IsSold ?? false,
-});
-
 const OPPONENT_TYPES = [
   { name: 'Raider', hp: 35, position: 2 },
   { name: 'Duelist', hp: 42, position: 2 },
@@ -104,7 +94,6 @@ class AuthService {
     this.isAuthenticated = false;
     this.tokenRefreshInterval = null;
     this.localEquipmentSlots = {};
-    this.localMarketListings = [];
     this.localRun = null;
     this.localBattle = null;
     this.adventureRewards = [];
@@ -211,7 +200,6 @@ class AuthService {
     this.user = null;
     this.isAuthenticated = false;
     this.localEquipmentSlots = {};
-    this.localMarketListings = [];
     this.localRun = null;
     this.localBattle = null;
     this.adventureRewards = [];
@@ -317,23 +305,12 @@ class AuthService {
   }
 
   async getInventory(scope = 'inventory') {
-    const listedIds = new Set(
-      this.localMarketListings
-        .filter((listing) => !listing.isSold)
-        .map((listing) => listing.itemId),
-    );
-
     try {
       const response = await api.getInventory(scope);
       const apiItems = uniqueItems([
         ...flattenItemResponse(response),
-        ...(scope === 'market' ? [] : this.adventureRewards),
+        ...(scope === 'inventory' ? this.adventureRewards : []),
       ]);
-
-      if (scope === 'market') {
-        const localItems = (await this.getAllKnownItems()).filter((item) => listedIds.has(item.id));
-        return { success: true, data: uniqueItems([...apiItems, ...localItems]) };
-      }
 
       if (scope === 'run') {
         const runIds = new Set(this.localRun?.itemIds || []);
@@ -341,20 +318,16 @@ class AuthService {
         return { success: true, data: uniqueItems([...apiItems, ...localRunItems]) };
       }
 
-      return { success: true, data: apiItems.filter((item) => !listedIds.has(item.id)) };
+      return { success: true, data: apiItems };
     } catch (error) {
       const items = await this.getAllKnownItems();
-
-      if (scope === 'market') {
-        return { success: true, data: items.filter((item) => listedIds.has(item.id)) };
-      }
 
       if (scope === 'run') {
         const runIds = new Set(this.localRun?.itemIds || []);
         return { success: true, data: items.filter((item) => runIds.has(item.id)) };
       }
 
-      return { success: true, data: items.filter((item) => !listedIds.has(item.id)) };
+      return { success: true, data: items };
     }
   }
 
@@ -445,7 +418,7 @@ class AuthService {
     return { success: true };
   }
 
-  createLocalRun(itemIds, difficulty = 'normal') {
+  createLocalRun(itemIds) {
     this.localRun = {
       id: `local-run-${Date.now()}`,
       status: 0,
@@ -453,24 +426,23 @@ class AuthService {
       playerCurrentHp: 100,
       playerMaxHp: 100,
       itemIds,
-      difficulty,
     };
     this.localBattle = null;
     return this.localRun;
   }
 
-  async startRun(itemIds = [], difficulty = 'normal') {
-    const selectedItemIds = [...new Set((itemIds || []).filter(Boolean))];
+  async startRun(_itemIds) {
+    const equippedItemIds = await this.getEquippedItemIds();
 
-    if (!selectedItemIds.length) {
-      return { success: false, error: 'Select adventure gear first.' };
+    if (!equippedItemIds.length) {
+      return { success: false, error: 'Equip at least one item before starting a run.' };
     }
 
     try {
-      const response = await api.startRun({ itemIds: selectedItemIds, difficulty });
+      const response = await api.startRun({ itemIds: equippedItemIds });
       return { success: true, data: response };
     } catch (_error) {
-      return { success: true, data: this.createLocalRun(selectedItemIds, difficulty) };
+      return { success: true, data: this.createLocalRun(equippedItemIds) };
     }
   }
 
@@ -656,84 +628,6 @@ class AuthService {
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: error.message };
-    }
-  }
-
-  async returnFromMarket(itemIdValue) {
-    try {
-      await api.returnFromMarket(itemIdValue);
-    } catch (_error) {
-      // Local listing recall below keeps the UI moving if the API route is unavailable.
-    }
-
-    this.localMarketListings = this.localMarketListings.filter(
-      (listing) => listing.itemId !== itemIdValue,
-    );
-    return { success: true };
-  }
-
-  async getMarketListings(category = null, pageNumber = 1, pageSize = 20, sort = 'asc') {
-    const local = this.localMarketListings
-      .filter(
-        (listing) =>
-          !listing.isSold &&
-          (!category || listing.category === category || listing.category === String(category)),
-      )
-      .sort((a, b) =>
-        sort === 'desc' ? Number(b.price) - Number(a.price) : Number(a.price) - Number(b.price),
-      );
-
-    try {
-      const response = await api.getMarketListings(category, pageNumber, pageSize, sort);
-      return {
-        success: true,
-        data: [...(Array.isArray(response) ? response.map(normalizeListing) : []), ...local],
-      };
-    } catch (_error) {
-      return { success: true, data: local };
-    }
-  }
-
-  async createMarketListing(itemIdValue, price) {
-    const numericPrice = Number(price);
-
-    try {
-      const response = await api.createMarketListing({ itemId: itemIdValue, price: numericPrice });
-      return { success: true, data: response };
-    } catch (_error) {
-      const items = await this.getAllKnownItems();
-      const item = items.find((candidate) => candidate.id === itemIdValue);
-
-      if (!item) {
-        return { success: false, error: 'Item not found in inventory' };
-      }
-
-      const listing = normalizeListing({
-        id: `local-listing-${Date.now()}`,
-        itemId: item.id,
-        itemName: item.name,
-        category: isWeapon(item) ? 'Weapon' : 'Armor',
-        price: numericPrice,
-        isSold: false,
-      });
-      this.localMarketListings = [...this.localMarketListings, listing];
-      return { success: true, data: listing };
-    }
-  }
-
-  async buyMarketItem(listingId) {
-    try {
-      const response = await api.buyMarketItem(listingId);
-      return { success: true, data: response };
-    } catch (_error) {
-      const listing = this.localMarketListings.find((candidate) => candidate.id === listingId);
-
-      if (!listing) {
-        return { success: false, error: 'Listing is not available right now' };
-      }
-
-      listing.isSold = true;
-      return { success: true, data: { message: 'Item bought' } };
     }
   }
 
