@@ -8,6 +8,7 @@ import authService from '../../services/authService';
 const MENU = [
   { key: 'inventory', label: 'Inventory' },
   { key: 'run', label: 'Adventure Gear' },
+  { key: 'market', label: 'Market Listings' },
   { key: 'equipment', label: 'Equipment' },
 ];
 
@@ -24,6 +25,7 @@ export default function EquipmentScreen() {
   const [activeRun, setActiveRun] = useState(null);
   const [inventory, setInventory] = useState([]);
   const [runInventory, setRunInventory] = useState([]);
+  const [marketInventory, setMarketInventory] = useState([]);
   const [equipPool, setEquipPool] = useState([]);
   const [equipmentSlots, setEquipmentSlots] = useState({});
   const [detailItem, setDetailItem] = useState(null);
@@ -68,6 +70,10 @@ export default function EquipmentScreen() {
             : [],
       );
       if (!inv.success || !runInv.success) Alert.alert('Error', 'Cannot load adventure gear');
+    } else if (view === 'market') {
+      const market = await authService.getInventory('market');
+      setMarketInventory(market.success ? market.data || [] : []);
+      if (!market.success) Alert.alert('Error', market.error || 'Cannot load market inventory');
     } else if (view === 'equipment') {
       const [slots, inv] = await Promise.all([
         authService.getEquipmentSlots(),
@@ -104,6 +110,15 @@ export default function EquipmentScreen() {
     await loadData();
   };
 
+  const recall = async (itemId) => {
+    const res = await authService.returnFromMarket(itemId);
+    if (!res.success) {
+      Alert.alert('Recall failed', res.error || 'Cannot recall item');
+      return;
+    }
+    loadData();
+  };
+
   const equipArmor = async (itemId) => {
     const res = await authService.equipItem({ id: itemId, armorType: 0 });
     if (!res.success) {
@@ -124,6 +139,10 @@ export default function EquipmentScreen() {
 
   const filteredInventory = useMemo(() => applyFilter(inventory), [inventory, applyFilter]);
   const filteredRun = useMemo(() => applyFilter(runInventory), [runInventory, applyFilter]);
+  const filteredMarket = useMemo(
+    () => applyFilter(marketInventory),
+    [marketInventory, applyFilter],
+  );
   const filteredEquipPool = useMemo(() => applyFilter(equipPool), [equipPool, applyFilter]);
   const equippedItemIds = useMemo(() => {
     const ids = new Set();
@@ -274,6 +293,21 @@ export default function EquipmentScreen() {
                   </>
                 )}
               </>
+            )}
+
+            {view === 'market' && (
+              <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+                {filteredMarket.map((i) =>
+                  renderMiniCard(i, {
+                    showStats: true,
+                    extraAction: (
+                      <TouchableOpacity style={styles.actionBtn} onPress={() => recall(i.id)}>
+                        <Text style={styles.actionTxt}>Recall</Text>
+                      </TouchableOpacity>
+                    ),
+                  }),
+                )}
+              </ScrollView>
             )}
 
             {view === 'equipment' && (
