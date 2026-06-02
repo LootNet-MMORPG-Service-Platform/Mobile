@@ -36,7 +36,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     const cleanEmail = sanitizeEmail(email);
     const emailError = validateEmail(cleanEmail);
-    const passwordError = validatePassword(password, 'Password', true);
+    const passwordError = validatePassword(password);
 
     if (emailError || passwordError) {
       Alert.alert('Error', emailError || passwordError);
@@ -104,7 +104,6 @@ export default function LoginScreen() {
               returnKeyType="done"
               textContentType="password"
               autoComplete="password"
-              maxLength={128}
               onSubmitEditing={handleLogin}
             />
             <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>

@@ -127,7 +127,6 @@ export default function RegisterScreen() {
               returnKeyType="next"
               textContentType="newPassword"
               autoComplete="new-password"
-              maxLength={128}
             />
           </View>
 
@@ -142,7 +141,6 @@ export default function RegisterScreen() {
               returnKeyType="done"
               textContentType="newPassword"
               autoComplete="new-password"
-              maxLength={128}
               onSubmitEditing={handleRegister}
             />
           </View>

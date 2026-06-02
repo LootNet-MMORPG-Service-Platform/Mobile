@@ -95,7 +95,6 @@ export default function LoginScreen() {
               returnKeyType="done"
               textContentType="password"
               autoComplete="password"
-              maxLength={128}
               onSubmitEditing={handleLogin}
             />
             <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>

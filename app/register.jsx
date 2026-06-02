@@ -47,7 +47,7 @@ export default function RegisterScreen() {
     const cleanEmail = sanitizeEmail(email);
     const usernameError = validateUsername(cleanUsername);
     const emailError = validateEmail(cleanEmail);
-    const passwordError = validatePassword(password, 'Password', true);
+    const passwordError = validatePassword(password);
     const confirmationError = validatePasswordConfirmation(password, confirmPassword);
 
     if (usernameError || emailError || passwordError || confirmationError) {
@@ -137,7 +137,6 @@ export default function RegisterScreen() {
               returnKeyType="next"
               textContentType="newPassword"
               autoComplete="new-password"
-              maxLength={128}
             />
           </View>
 
@@ -152,7 +151,6 @@ export default function RegisterScreen() {
               returnKeyType="done"
               textContentType="newPassword"
               autoComplete="new-password"
-              maxLength={128}
               onSubmitEditing={handleRegister}
             />
           </View>

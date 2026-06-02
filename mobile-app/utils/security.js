@@ -2,6 +2,8 @@ const USERNAME_PATTERN = /^[a-zA-Z0-9_.-]{3,32}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_MAX_LENGTH = 128;
+export const DEVELOPMENT = typeof __DEV__ !== 'undefined' && __DEV__;
+export const ALLOW_WEAK_PASSWORDS_IN_DEVELOPMENT = true;
 
 export const sanitizeUsername = (value = '') => value.trim().slice(0, 32);
 export const sanitizeEmail = (value = '') => value.trim().toLowerCase().slice(0, 256);
@@ -37,6 +39,10 @@ export const validateUsername = (value) => {
 export const validatePassword = (value, label = 'Password') => {
   if (!value) {
     return `${label} is required.`;
+  }
+
+  if (DEVELOPMENT && ALLOW_WEAK_PASSWORDS_IN_DEVELOPMENT) {
+    return null;
   }
 
   if (value.length < PASSWORD_MIN_LENGTH) {
