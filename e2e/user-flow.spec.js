@@ -223,7 +223,7 @@ async function login(page) {
   await page.getByPlaceholder('Email').fill('player@example.com');
   await page.getByPlaceholder('Password', { exact: true }).fill('short');
   await page.getByText('Login', { exact: true }).click();
-  await expect(page.getByText(/welcome back, player1/i)).toBeVisible();
+  await expect(page.getByText(/welcome back, player1/i).last()).toBeVisible();
 }
 
 test('main mobile user flow covers dashboard, equipment, daily reward, profile and logout', async ({
@@ -234,7 +234,7 @@ test('main mobile user flow covers dashboard, equipment, daily reward, profile a
 
   await login(page);
 
-  await expect(page.getByText('777')).toBeVisible();
+  await expect(page.getByText('777').last()).toBeVisible();
 
   await page.getByRole('tab', { name: /Equipment/ }).click();
   await expect(page.getByText('INVENTORY', { exact: true })).toBeVisible();
@@ -248,7 +248,7 @@ test('main mobile user flow covers dashboard, equipment, daily reward, profile a
   await expect(page.getByText('Daily Axe')).toBeVisible();
 
   await page.getByRole('tab', { name: /Profile/ }).click();
-  await expect(page.getByText('player1').first()).toBeVisible();
+  await expect(page.getByText('player1', { exact: true })).toBeVisible();
   await expect(page.getByText('Currency: 777')).toBeVisible();
   await page.getByText('Logout').click();
   await expect(page).toHaveURL(/\/login/);

@@ -14,7 +14,7 @@ module.exports = defineConfig({
     command: 'npx expo start --web --port 8082',
     url: 'http://127.0.0.1:8082/login',
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 240_000,
     env: {
       ...process.env,
       BROWSER: 'none',
