@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import authService from '../services/authService';
+import eventBus, { AppEvents } from '../patterns/EventBus';
 
 const AuthContext = createContext();
 const BACKGROUND_SESSION_TIMEOUT_MS = 15 * 60 * 1000;
@@ -41,6 +42,23 @@ export const AuthProvider = ({ children }) => {
     };
 
     checkAuth();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribeAuthChanged = eventBus.subscribe(AppEvents.AUTH_CHANGED, (payload) => {
+      setUser(payload.user || null);
+      setIsAuthenticated(!!payload.isAuthenticated);
+    });
+
+    const unsubscribeAuthCleared = eventBus.subscribe(AppEvents.AUTH_CLEARED, () => {
+      setUser(null);
+      setIsAuthenticated(false);
+    });
+
+    return () => {
+      unsubscribeAuthChanged();
+      unsubscribeAuthCleared();
+    };
   }, []);
 
   useEffect(() => {

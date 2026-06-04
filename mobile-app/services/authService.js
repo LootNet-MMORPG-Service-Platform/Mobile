@@ -1,5 +1,8 @@
 import api from './api';
 import Storage from '../utils/storage';
+import eventBus, { AppEvents } from '../patterns/EventBus';
+import { resolveBattleAction } from '../patterns/battleActionStrategies';
+import { LocalEntityFactory } from '../patterns/localEntityFactory';
 
 const logAuthWarning = (label, error) => {
   if (__DEV__) {
@@ -92,12 +95,6 @@ const normalizeListing = (listing) => ({
   isSold: listing?.isSold ?? listing?.IsSold ?? false,
 });
 
-const OPPONENT_TYPES = [
-  { name: 'Raider', hp: 35, position: 2 },
-  { name: 'Duelist', hp: 42, position: 2 },
-  { name: 'Guard', hp: 50, position: 3 },
-];
-
 class AuthService {
   constructor() {
     this.user = null;
@@ -150,6 +147,10 @@ class AuthService {
       this.user = profileResponse;
       this.isAuthenticated = true;
       await Storage.setItem('userData', JSON.stringify(profileResponse));
+      eventBus.publish(AppEvents.AUTH_CHANGED, {
+        user: profileResponse,
+        isAuthenticated: true,
+      });
 
       this.startTokenRefreshMonitoring();
 
@@ -215,6 +216,7 @@ class AuthService {
     this.localRun = null;
     this.localBattle = null;
     this.adventureRewards = [];
+    eventBus.publish(AppEvents.AUTH_CLEARED);
   }
 
   async logout() {
@@ -244,6 +246,10 @@ class AuthService {
           api.setToken(token, refreshToken);
           this.user = JSON.parse(userData);
           this.isAuthenticated = true;
+          eventBus.publish(AppEvents.AUTH_CHANGED, {
+            user: this.user,
+            isAuthenticated: true,
+          });
 
           this.startTokenRefreshMonitoring();
 
@@ -446,14 +452,7 @@ class AuthService {
   }
 
   createLocalRun(itemIds) {
-    this.localRun = {
-      id: `local-run-${Date.now()}`,
-      status: 0,
-      battleIndex: 0,
-      playerCurrentHp: 100,
-      playerMaxHp: 100,
-      itemIds,
-    };
+    this.localRun = LocalEntityFactory.createRun(itemIds);
     this.localBattle = null;
     return this.localRun;
   }
@@ -493,28 +492,9 @@ class AuthService {
 
   createLocalBattle() {
     if (!this.localRun) return null;
-    const enemyCount = 1;
     this.localRun.status = 1;
     this.localRun.battleIndex = (this.localRun.battleIndex || 0) + 1;
-    this.localBattle = {
-      battleId: `local-battle-${Date.now()}`,
-      playerCurrentHp: this.localRun.playerCurrentHp,
-      playerMaxHp: this.localRun.playerMaxHp,
-      playerPosition: 1,
-      leftHandItemId: this.localEquipmentSlots.weapon1?.id || null,
-      rightHandItemId:
-        this.localEquipmentSlots.weapon2?.id || this.localEquipmentSlots.weapon1?.id || null,
-      enemies: Array.from({ length: enemyCount }, (_, index) => {
-        const type = OPPONENT_TYPES[(this.localRun.battleIndex + index) % OPPONENT_TYPES.length];
-        return {
-          id: `enemy-${Date.now()}-${index}`,
-          name: type.name,
-          position: type.position,
-          currentHp: type.hp,
-          maxHp: type.hp,
-        };
-      }),
-    };
+    this.localBattle = LocalEntityFactory.createBattle(this.localRun, this.localEquipmentSlots);
     return this.localBattle;
   }
 
@@ -531,16 +511,9 @@ class AuthService {
   }
 
   createLocalReward() {
-    const reward = normalizeItem({
-      id: `local-item-${Date.now()}`,
-      name: 'Adventure Loot',
-      category: 'Weapon',
-      weaponType: 0,
-      cut: 8 + Math.round(Math.random() * 8),
-      blunt: 4 + Math.round(Math.random() * 6),
-      elements: [],
-    });
+    const reward = LocalEntityFactory.createReward(normalizeItem);
     this.rememberAdventureRewards([reward]);
+    eventBus.publish(AppEvents.REWARD_CLAIMED, reward);
     return reward;
   }
 
@@ -568,25 +541,13 @@ class AuthService {
     let rewardItems = [];
     let message = '';
 
-    if (type === 0) {
-      const target =
-        this.localBattle.enemies.find((enemy) => enemy.position === action.targetPosition) ||
-        this.localBattle.enemies[0];
-      if (target) {
-        damageDealt = 24;
-        target.currentHp = Math.max(0, target.currentHp - damageDealt);
-        log.push(`You hit opponent at distance ${target.position}.`);
-      }
-    } else if (type === 2) {
-      this.localBattle.playerPosition = action.targetPosition ?? this.localBattle.playerPosition;
-      log.push(`You moved to position ${this.localBattle.playerPosition}.`);
-    } else if (type === 1) {
-      this.localBattle.leftHandItemId = action.leftWeapon?.id || null;
-      this.localBattle.rightHandItemId = action.rightWeapon?.id || null;
-      log.push('You changed battle hands.');
-    } else {
-      log.push('You held position and ended the turn.');
-    }
+    const actionResult = resolveBattleAction({
+      battle: this.localBattle,
+      action,
+      type,
+    });
+    log.push(...actionResult.log);
+    damageDealt = actionResult.damageDealt;
 
     this.localBattle.enemies = this.localBattle.enemies.filter((enemy) => enemy.currentHp > 0);
 
@@ -707,15 +668,11 @@ class AuthService {
         return { success: false, error: 'Item not found in inventory' };
       }
 
-      const listing = normalizeListing({
-        id: `local-listing-${Date.now()}`,
-        itemId: item.id,
-        itemName: item.name,
-        category: isWeapon(item) ? 'Weapon' : 'Armor',
-        price: numericPrice,
-        isSold: false,
-      });
+      const listing = normalizeListing(
+        LocalEntityFactory.createMarketListing(item, numericPrice, isWeapon),
+      );
       this.localMarketListings = [...this.localMarketListings, listing];
+      eventBus.publish(AppEvents.MARKET_LISTING_CREATED, listing);
       return { success: true, data: listing };
     }
   }
@@ -740,7 +697,9 @@ class AuthService {
     try {
       const response = await api.claimDailyReward();
       this.rememberAdventureRewards([response]);
-      return { success: true, data: normalizeItem(response) };
+      const reward = normalizeItem(response);
+      eventBus.publish(AppEvents.REWARD_CLAIMED, reward);
+      return { success: true, data: reward };
     } catch (error) {
       logAuthWarning('Daily reward failed', error);
       return { success: false, error: error.message };

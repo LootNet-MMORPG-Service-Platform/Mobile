@@ -46,7 +46,11 @@
       "reactCompiler": true
     },
     "extra": {
-      "apiBaseUrl": "https://lootnet-api.onrender.com/api"
+      "apiBaseUrl": "https://lootnet-api.onrender.com/api",
+      "router": {},
+      "eas": {
+        "projectId": "13f6a90a-dc49-4b05-9250-8818745b5665"
+      }
     }
   }
 }
